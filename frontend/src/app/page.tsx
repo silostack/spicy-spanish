@@ -29,7 +29,7 @@ export default function Home() {
             <div className="md:w-1/2">
               <div className="relative h-80 md:h-96 w-full rounded-lg overflow-hidden shadow-xl">
                 <Image
-                  src="https://images.unsplash.com/photo-1503791774117-08c379DDC732"
+                  src="/images/spanish-students-placeholder.jpg"
                   alt="Students learning Spanish"
                   fill
                   className="object-cover"

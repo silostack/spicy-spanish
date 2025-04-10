@@ -118,7 +118,7 @@ export class EmailService {
       <ul>
         <li><strong>Student:</strong> {{studentName}}</li>
         <li><strong>Email:</strong> {{studentEmail}}</li>
-        <li><strong>Amount:</strong> ${{amount}}</li>
+        <li><strong>Amount:</strong> ${{}}</li>
         <li><strong>Hours Purchased:</strong> {{hours}}</li>
         <li><strong>Payment Method:</strong> {{paymentMethod}}</li>
         <li><strong>Date:</strong> {{date}}</li>

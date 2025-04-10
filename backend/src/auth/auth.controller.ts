@@ -12,6 +12,11 @@ import { UserRole } from '../users/entities/user.entity';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Get('test')
+  test() {
+    return { message: 'Auth controller is working!' };
+  }
+
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);

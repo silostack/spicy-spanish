@@ -70,7 +70,13 @@ export class AuthService {
     user.phoneNumber = registerDto.phoneNumber;
 
     await this.em.persistAndFlush(user);
-    await this.emailService.sendNewStudentRegistrationEmail(user);
+    
+    // Try to send email, but don't fail registration if email fails
+    try {
+      await this.emailService.sendNewStudentRegistrationEmail(user);
+    } catch (error) {
+      console.error('Failed to send registration email:', error);
+    }
 
     const { password: _, ...result } = user;
     return result;
@@ -114,7 +120,13 @@ export class AuthService {
     user.invitationToken = invitationToken;
 
     await this.em.persistAndFlush(user);
-    await this.emailService.sendTutorInvitation(email, invitationToken);
+    
+    // Try to send email, but don't fail invitation if email fails
+    try {
+      await this.emailService.sendTutorInvitation(email, invitationToken);
+    } catch (error) {
+      console.error('Failed to send tutor invitation email:', error);
+    }
 
     return { message: 'Invitation sent successfully' };
   }

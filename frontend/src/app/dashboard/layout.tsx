@@ -31,15 +31,35 @@ export default function DashboardLayout({
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 
-  // Mock user data - in a real app this would come from your authentication context
-  const user = {
-    firstName: 'John',
-    lastName: 'Doe',
-    role: 'student', // This would be dynamically set based on the user's actual role
-  };
+  // Get user data from localStorage
+  const [user, setUser] = useState({
+    firstName: '',
+    lastName: '',
+    role: '',
+  });
+  
+  useEffect(() => {
+    // Check if running in browser and get user from localStorage
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser({
+            firstName: parsedUser.firstName,
+            lastName: parsedUser.lastName,
+            role: parsedUser.role,
+          });
+        } catch (e) {
+          console.error('Error parsing user data', e);
+        }
+      }
+    }
+  }, []);
 
   const navItems = {
     student: [

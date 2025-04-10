@@ -18,11 +18,22 @@ async function bootstrap() {
 
   // CORS
   if (configService.get('NODE_ENV') === 'development') {
-    app.enableCors();
+    app.enableCors({
+      origin: true, // Allow any origin in development
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      allowedHeaders: 'Content-Type,Accept,Authorization',
+      credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    });
   } else {
     app.enableCors({
       origin: configService.get('FRONTEND_URL'),
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      allowedHeaders: 'Content-Type,Accept,Authorization',
       credentials: true,
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
     });
   }
 

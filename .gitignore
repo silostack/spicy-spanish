@@ -1,0 +1,11 @@
+# Project exclude paths
+/backend/.env
+/frontend/.env.local
+
+
+
+# compiled output
+**/.idea
+**/node_modules
+**/dist
+**/.next

@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import MainLayout from '../components/MainLayout';
+import { authService, RegisterData } from '../utils/api';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -27,6 +28,15 @@ export default function Register() {
     }));
   };
 
+  const testConnection = async () => {
+    try {
+      const result = await authService.testConnection();
+      alert(`API Connection Test Success: ${JSON.stringify(result)}`);
+    } catch (error: any) {
+      alert(`API Connection Test Failed: ${error.message}`);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -40,17 +50,43 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      // This would be replaced with actual API call
-      console.log('Registering with:', formData);
+      // Create registration data object
+      const registrationData: RegisterData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        timezone: formData.timezone,
+      };
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Only add phone number if it's not empty and valid
+      if (formData.phoneNumber && formData.phoneNumber.trim()) {
+        // Ensure phone number is in international format (add + if missing)
+        const phoneNumber = formData.phoneNumber.startsWith('+') 
+          ? formData.phoneNumber 
+          : `+1${formData.phoneNumber}`; // Default to US format if no country code
+        registrationData.phoneNumber = phoneNumber;
+      }
+      
+      // Register student via API
+      await authService.registerStudent(registrationData);
       
       // Redirect to login page after successful registration
       router.push('/login?registered=true');
-    } catch (err) {
-      setError('An error occurred during registration. Please try again.');
-      console.error('Registration error:', err);
+    } catch (err: any) {
+      console.error('Registration error details:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        config: {
+          url: err.config?.url,
+          method: err.config?.method,
+          baseURL: err.config?.baseURL,
+          headers: err.config?.headers,
+        }
+      });
+      setError(err.response?.data?.message || `Error: ${err.message || 'An error occurred during registration. Please try again.'}`);
     } finally {
       setIsLoading(false);
     }

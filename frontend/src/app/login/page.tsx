@@ -1,36 +1,51 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MainLayout from '../components/MainLayout';
+import { authService } from '../utils/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  useEffect(() => {
+    // Check if user was redirected from registration
+    const registered = searchParams.get('registered');
+    if (registered === 'true') {
+      setSuccessMessage('Registration successful! Please log in with your credentials.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setIsLoading(true);
 
     try {
-      // This would be replaced with actual API call
-      console.log('Logging in with:', { email, password });
+      const response = await authService.login(email, password);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Store token and user info in localStorage
+      localStorage.setItem('token', response.access_token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       
-      // Store token in localStorage
-      localStorage.setItem('token', 'sample-token');
-      
-      // Redirect based on user role (this would come from the API response)
-      router.push('/dashboard');
-    } catch (err) {
-      setError('Invalid email or password. Please try again.');
+      // Redirect based on user role
+      if (response.user.role === 'admin') {
+        router.push('/dashboard');
+      } else if (response.user.role === 'tutor') {
+        router.push('/dashboard');
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);
@@ -50,6 +65,12 @@ export default function Login() {
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
                 <span className="block sm:inline">{error}</span>
+              </div>
+            )}
+            
+            {successMessage && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <span className="block sm:inline">{successMessage}</span>
               </div>
             )}
 

@@ -65,13 +65,13 @@ export class Transaction {
     hours: number,
     paymentMethod: PaymentMethod,
     status: TransactionStatus = TransactionStatus.PENDING,
-    package?: Package,
+    classPackage?: Package,
   ) {
     this.student = student;
     this.amountUsd = amountUsd;
     this.hours = hours;
     this.paymentMethod = paymentMethod;
     this.status = status;
-    this.package = package;
+    this.package = classPackage;
   }
 }
