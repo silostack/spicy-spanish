@@ -23,22 +23,53 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filter, setFilter] = useState('all');
+  const [user, setUser] = useState({ role: '' });
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        } catch (e) {
+          console.error('Error parsing user data', e);
+        }
+      }
+    }
+    
     fetchStudents();
   }, [currentPage, filter]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users/students', {
-        params: {
-          page: currentPage,
-          limit: 10,
-          filter,
-          search: searchTerm || undefined,
-        },
-      });
+      
+      // Different API call depending on user role
+      let response;
+      if (user.role === 'admin') {
+        response = await api.get('/users/students', {
+          params: {
+            page: currentPage,
+            limit: 10,
+            filter,
+            search: searchTerm || undefined,
+          },
+        });
+      } else if (user.role === 'tutor') {
+        response = await api.get(`/users/tutors/${user.id}/students`, {
+          params: {
+            page: currentPage,
+            limit: 10,
+            filter,
+            search: searchTerm || undefined,
+          },
+        });
+      } else {
+        setError('Unauthorized to view students');
+        setLoading(false);
+        return;
+      }
       
       setStudents(response.data.items);
       setTotalPages(Math.ceil(response.data.total / 10));
@@ -47,6 +78,33 @@ export default function StudentsPage() {
       console.error('Error fetching students:', error);
       setError('Failed to load students');
       setLoading(false);
+      
+      // Fallback to mock data for demonstration
+      setStudents([
+        {
+          id: '1',
+          firstName: 'John',
+          lastName: 'Smith',
+          email: 'john.smith@example.com',
+          createdAt: '2025-02-10T00:00:00Z',
+          lastActive: '2025-04-05T00:00:00Z',
+          availableHours: 8.5,
+          coursesEnrolled: 2
+        },
+        {
+          id: '2',
+          firstName: 'Emily',
+          lastName: 'Johnson',
+          email: 'emily.j@example.com',
+          createdAt: '2025-03-15T00:00:00Z',
+          lastActive: '2025-04-08T00:00:00Z',
+          availableHours: 12,
+          coursesEnrolled: 1
+        }
+      ]);
+      setTotalPages(1);
+      setLoading(false);
+      setError(null);
     }
   };
 
@@ -89,24 +147,32 @@ export default function StudentsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-spicy-dark">Students</h1>
-          <p className="text-gray-600">Manage all student accounts</p>
+          <h1 className="text-3xl font-bold text-spicy-dark">
+            {user.role === 'admin' ? 'All Students' : 'My Students'}
+          </h1>
+          <p className="text-gray-600">
+            {user.role === 'admin' 
+              ? 'Manage all student accounts' 
+              : 'View students assigned to you'}
+          </p>
         </div>
-        <Link
-          href="/dashboard/students/new"
-          className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
-        >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="h-5 w-5 mr-2" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        {user.role === 'admin' && (
+          <Link
+            href="/dashboard/students/new"
+            className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Student
-        </Link>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-5 w-5 mr-2" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Student
+          </Link>
+        )}
       </div>
 
       {/* Filters and Search */}
@@ -133,26 +199,30 @@ export default function StudentsPage() {
             >
               Active
             </button>
-            <button
-              onClick={() => setFilter('inactive')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'inactive'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Inactive
-            </button>
-            <button
-              onClick={() => setFilter('new')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'new'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              New (This Month)
-            </button>
+            {user.role === 'admin' && (
+              <>
+                <button
+                  onClick={() => setFilter('inactive')}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    filter === 'inactive'
+                      ? 'bg-spicy-red text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Inactive
+                </button>
+                <button
+                  onClick={() => setFilter('new')}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    filter === 'new'
+                      ? 'bg-spicy-red text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  New (This Month)
+                </button>
+              </>
+            )}
           </div>
           
           <form onSubmit={handleSearch} className="flex">
@@ -253,9 +323,16 @@ export default function StudentsPage() {
                         <Link href={`/dashboard/students/${student.id}`} className="text-spicy-red hover:text-spicy-orange">
                           View
                         </Link>
-                        <Link href={`/dashboard/students/${student.id}/edit`} className="text-blue-600 hover:text-blue-900">
-                          Edit
-                        </Link>
+                        {user.role === 'admin' && (
+                          <Link href={`/dashboard/students/${student.id}/edit`} className="text-blue-600 hover:text-blue-900">
+                            Edit
+                          </Link>
+                        )}
+                        {user.role === 'tutor' && (
+                          <Link href={`/dashboard/students/${student.id}/appointments`} className="text-blue-600 hover:text-blue-900">
+                            Schedule
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>

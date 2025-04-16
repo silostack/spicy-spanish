@@ -1,8 +1,412 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { InjectRepository } from '@mikro-orm/nestjs';
+import { Appointment, AppointmentStatus } from './entities/appointment.entity';
+import { Availability } from './entities/availability.entity';
+import { User, UserRole } from '../users/entities/user.entity';
+
+interface CreateAppointmentDto {
+  studentId: string;
+  tutorId: string;
+  startTime: Date;
+  endTime: Date;
+  notes?: string;
+}
+
+interface UpdateAppointmentDto {
+  startTime?: Date;
+  endTime?: Date;
+  status?: AppointmentStatus;
+  notes?: string;
+}
+
+interface CreateAvailabilityDto {
+  tutorId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isRecurring?: boolean;
+  specificDate?: Date;
+}
+
+interface UpdateAvailabilityDto {
+  dayOfWeek?: number;
+  startTime?: string;
+  endTime?: string;
+  isRecurring?: boolean;
+  specificDate?: Date;
+}
 
 @Injectable()
 export class SchedulingService {
-  findAll() {
-    return [];
+  constructor(
+    @InjectRepository(Appointment)
+    private readonly appointmentRepository: EntityRepository<Appointment>,
+    @InjectRepository(Availability)
+    private readonly availabilityRepository: EntityRepository<Availability>,
+    @InjectRepository(User)
+    private readonly userRepository: EntityRepository<User>,
+    private readonly em: EntityManager,
+  ) {}
+
+  // Appointment methods
+  async findAllAppointments() {
+    return this.appointmentRepository.findAll({
+      populate: ['student', 'tutor'],
+      orderBy: { startTime: 'ASC' },
+    });
+  }
+
+  async findAppointmentById(id: string) {
+    const appointment = await this.appointmentRepository.findOne({ id }, {
+      populate: ['student', 'tutor'],
+    });
+    
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${id} not found`);
+    }
+    
+    return appointment;
+  }
+
+  async findAppointmentsByStudent(studentId: string) {
+    return this.appointmentRepository.find(
+      { student: studentId },
+      {
+        populate: ['student', 'tutor'],
+        orderBy: { startTime: 'ASC' },
+      }
+    );
+  }
+
+  async findAppointmentsByTutor(tutorId: string) {
+    return this.appointmentRepository.find(
+      { tutor: tutorId },
+      {
+        populate: ['student', 'tutor'],
+        orderBy: { startTime: 'ASC' },
+      }
+    );
+  }
+
+  async findUpcomingAppointmentsByStudent(studentId: string) {
+    const now = new Date();
+    return this.appointmentRepository.find(
+      { 
+        student: studentId,
+        startTime: { $gt: now },
+        status: AppointmentStatus.SCHEDULED,
+      },
+      {
+        populate: ['student', 'tutor'],
+        orderBy: { startTime: 'ASC' },
+      }
+    );
+  }
+
+  async findUpcomingAppointmentsByTutor(tutorId: string) {
+    const now = new Date();
+    return this.appointmentRepository.find(
+      { 
+        tutor: tutorId,
+        startTime: { $gt: now },
+        status: AppointmentStatus.SCHEDULED,
+      },
+      {
+        populate: ['student', 'tutor'],
+        orderBy: { startTime: 'ASC' },
+      }
+    );
+  }
+
+  async createAppointment(createAppointmentDto: CreateAppointmentDto) {
+    const student = await this.userRepository.findOne({ 
+      id: createAppointmentDto.studentId,
+      role: UserRole.STUDENT,
+    });
+    
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${createAppointmentDto.studentId} not found`);
+    }
+    
+    const tutor = await this.userRepository.findOne({ 
+      id: createAppointmentDto.tutorId,
+      role: UserRole.TUTOR,
+    });
+    
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${createAppointmentDto.tutorId} not found`);
+    }
+    
+    // Verify time is within tutor's availability
+    const isAvailable = await this.checkTutorAvailability(
+      tutor.id,
+      createAppointmentDto.startTime,
+      createAppointmentDto.endTime
+    );
+    
+    if (!isAvailable) {
+      throw new BadRequestException('The selected time is not within the tutor\'s availability');
+    }
+    
+    // Check for time conflicts
+    const conflicts = await this.checkTimeConflicts(
+      tutor.id,
+      createAppointmentDto.startTime,
+      createAppointmentDto.endTime
+    );
+    
+    if (conflicts) {
+      throw new BadRequestException('The selected time conflicts with another appointment');
+    }
+    
+    const appointment = new Appointment(
+      student,
+      tutor,
+      createAppointmentDto.startTime,
+      createAppointmentDto.endTime
+    );
+    
+    if (createAppointmentDto.notes) {
+      appointment.notes = createAppointmentDto.notes;
+    }
+    
+    await this.em.persistAndFlush(appointment);
+    return appointment;
+  }
+
+  async updateAppointment(id: string, updateAppointmentDto: UpdateAppointmentDto) {
+    const appointment = await this.findAppointmentById(id);
+    
+    // If updating times, verify availability and conflicts
+    if (updateAppointmentDto.startTime || updateAppointmentDto.endTime) {
+      const startTime = updateAppointmentDto.startTime || appointment.startTime;
+      const endTime = updateAppointmentDto.endTime || appointment.endTime;
+      
+      // Verify time is within tutor's availability
+      const isAvailable = await this.checkTutorAvailability(
+        appointment.tutor.id,
+        startTime,
+        endTime
+      );
+      
+      if (!isAvailable) {
+        throw new BadRequestException('The selected time is not within the tutor\'s availability');
+      }
+      
+      // Check for time conflicts (excluding this appointment)
+      const conflicts = await this.checkTimeConflicts(
+        appointment.tutor.id,
+        startTime,
+        endTime,
+        id
+      );
+      
+      if (conflicts) {
+        throw new BadRequestException('The selected time conflicts with another appointment');
+      }
+    }
+    
+    this.em.assign(appointment, updateAppointmentDto);
+    await this.em.flush();
+    return appointment;
+  }
+
+  async cancelAppointment(id: string) {
+    const appointment = await this.findAppointmentById(id);
+    appointment.status = AppointmentStatus.CANCELLED;
+    await this.em.flush();
+    return appointment;
+  }
+
+  async completeAppointment(id: string) {
+    const appointment = await this.findAppointmentById(id);
+    appointment.status = AppointmentStatus.COMPLETED;
+    await this.em.flush();
+    return appointment;
+  }
+
+  // Availability methods
+  async findAvailabilityById(id: string) {
+    const availability = await this.availabilityRepository.findOne({ id }, {
+      populate: ['tutor'],
+    });
+    
+    if (!availability) {
+      throw new NotFoundException(`Availability with ID ${id} not found`);
+    }
+    
+    return availability;
+  }
+
+  async findAvailabilityByTutor(tutorId: string) {
+    return this.availabilityRepository.find(
+      { tutor: tutorId },
+      {
+        populate: ['tutor'],
+        orderBy: [
+          { dayOfWeek: 'ASC' },
+          { startTime: 'ASC' },
+        ],
+      }
+    );
+  }
+
+  async createAvailability(createAvailabilityDto: CreateAvailabilityDto) {
+    const tutor = await this.userRepository.findOne({ 
+      id: createAvailabilityDto.tutorId,
+      role: UserRole.TUTOR,
+    });
+    
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${createAvailabilityDto.tutorId} not found`);
+    }
+    
+    const availability = new Availability(
+      tutor,
+      createAvailabilityDto.dayOfWeek,
+      createAvailabilityDto.startTime,
+      createAvailabilityDto.endTime,
+      createAvailabilityDto.isRecurring !== undefined ? createAvailabilityDto.isRecurring : true,
+      createAvailabilityDto.specificDate
+    );
+    
+    await this.em.persistAndFlush(availability);
+    return availability;
+  }
+
+  async updateAvailability(id: string, updateAvailabilityDto: UpdateAvailabilityDto) {
+    const availability = await this.findAvailabilityById(id);
+    this.em.assign(availability, updateAvailabilityDto);
+    await this.em.flush();
+    return availability;
+  }
+
+  async removeAvailability(id: string) {
+    const availability = await this.findAvailabilityById(id);
+    await this.em.removeAndFlush(availability);
+    return { id, deleted: true };
+  }
+
+  // Helper methods
+  private async checkTutorAvailability(
+    tutorId: string,
+    startTime: Date,
+    endTime: Date
+  ): Promise<boolean> {
+    const day = startTime.getDay();
+    const timeStart = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
+    const timeEnd = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    
+    // Check recurring availability
+    const recurringAvailability = await this.availabilityRepository.findOne({
+      tutor: tutorId,
+      dayOfWeek: day,
+      isRecurring: true,
+      startTime: { $lte: timeStart },
+      endTime: { $gte: timeEnd },
+    });
+    
+    if (recurringAvailability) {
+      return true;
+    }
+    
+    // Check specific date availability
+    const specificDate = new Date(startTime);
+    specificDate.setHours(0, 0, 0, 0);
+    
+    const specificAvailability = await this.availabilityRepository.findOne({
+      tutor: tutorId,
+      isRecurring: false,
+      specificDate,
+      startTime: { $lte: timeStart },
+      endTime: { $gte: timeEnd },
+    });
+    
+    return !!specificAvailability;
+  }
+
+  private async checkTimeConflicts(
+    tutorId: string,
+    startTime: Date,
+    endTime: Date,
+    excludeAppointmentId?: string
+  ): Promise<boolean> {
+    const query = {
+      tutor: tutorId,
+      status: AppointmentStatus.SCHEDULED,
+      $or: [
+        // Case 1: New appointment starts during an existing appointment
+        { startTime: { $lt: endTime }, endTime: { $gt: startTime } },
+        // Case 2: New appointment contains an existing appointment
+        { startTime: { $gte: startTime, $lt: endTime } },
+        // Case 3: New appointment ends during an existing appointment
+        { startTime: { $lt: startTime }, endTime: { $gt: startTime, $lte: endTime } },
+      ],
+    };
+    
+    if (excludeAppointmentId) {
+      Object.assign(query, { id: { $ne: excludeAppointmentId } });
+    }
+    
+    const conflictingAppointments = await this.appointmentRepository.count(query);
+    return conflictingAppointments > 0;
+  }
+
+  // Dashboard stats
+  async getSchedulingStats() {
+    const now = new Date();
+    
+    // Get upcoming appointments
+    const upcomingAppointments = await this.appointmentRepository.find(
+      { 
+        startTime: { $gt: now },
+        status: AppointmentStatus.SCHEDULED,
+      },
+      {
+        populate: ['student', 'tutor'],
+        orderBy: { startTime: 'ASC' },
+        limit: 5,
+      }
+    );
+    
+    // Get completed appointments this month
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const completedAppointmentsThisMonth = await this.appointmentRepository.count({
+      status: AppointmentStatus.COMPLETED,
+      startTime: { $gte: firstDayOfMonth, $lte: now },
+    });
+    
+    // Get total hours taught (completed appointments)
+    const completedAppointments = await this.appointmentRepository.find({
+      status: AppointmentStatus.COMPLETED,
+    });
+    
+    let totalHoursTaught = 0;
+    completedAppointments.forEach(appointment => {
+      const durationHours = (appointment.endTime.getTime() - appointment.startTime.getTime()) / (1000 * 60 * 60);
+      totalHoursTaught += durationHours;
+    });
+    
+    // Get total scheduled hours
+    const scheduledAppointments = await this.appointmentRepository.find({
+      status: AppointmentStatus.SCHEDULED,
+      startTime: { $gt: now },
+    });
+    
+    let totalScheduledHours = 0;
+    scheduledAppointments.forEach(appointment => {
+      const durationHours = (appointment.endTime.getTime() - appointment.startTime.getTime()) / (1000 * 60 * 60);
+      totalScheduledHours += durationHours;
+    });
+    
+    return {
+      upcomingAppointments,
+      completedAppointmentsThisMonth,
+      totalHoursTaught,
+      totalScheduledHours,
+      totalCompletedAppointments: completedAppointments.length,
+      totalScheduledAppointments: scheduledAppointments.length,
+    };
   }
 }
