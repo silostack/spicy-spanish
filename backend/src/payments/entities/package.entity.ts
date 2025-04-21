@@ -21,6 +21,12 @@ export class Package {
   @Property({ default: true })
   isActive: boolean;
 
+  @Property({ nullable: true })
+  stripeProductId?: string;
+
+  @Property({ nullable: true })
+  stripePriceId?: string;
+
   @Property()
   createdAt: Date = new Date();
 
@@ -33,11 +39,15 @@ export class Package {
     hours: number,
     priceUsd: number,
     isActive: boolean = true,
+    stripeProductId?: string,
+    stripePriceId?: string,
   ) {
     this.name = name;
     this.description = description;
     this.hours = hours;
     this.priceUsd = priceUsd;
     this.isActive = isActive;
+    this.stripeProductId = stripeProductId;
+    this.stripePriceId = stripePriceId;
   }
 }

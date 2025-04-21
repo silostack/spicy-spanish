@@ -1,16 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { InjectRepository } from '@mikro-orm/nestjs';
 import * as nodemailer from 'nodemailer';
 import * as handlebars from 'handlebars';
 import { User } from '../users/entities/user.entity';
-import { Appointment } from '../scheduling/entities/appointment.entity';
+import { Appointment, AppointmentStatus } from '../scheduling/entities/appointment.entity';
 import { Transaction } from '../payments/entities/transaction.entity';
 
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(EmailService.name);
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(Appointment)
+    private readonly appointmentRepository: EntityRepository<Appointment>,
+    private readonly em: EntityManager,
+  ) {
     this.transporter = nodemailer.createTransport({
       host: this.configService.get('EMAIL_HOST'),
       port: this.configService.get('EMAIL_PORT'),
@@ -112,13 +121,13 @@ export class EmailService {
   }
 
   async sendPaymentNotification(transaction: Transaction): Promise<void> {
+        // <li><strong>Amount:</strong> ${{amount}}</li>
     const template = `
       <h1>New Payment Received</h1>
       <p>A new payment has been processed on Spicy Spanish:</p>
       <ul>
         <li><strong>Student:</strong> {{studentName}}</li>
         <li><strong>Email:</strong> {{studentEmail}}</li>
-        <li><strong>Amount:</strong> ${{}}</li>
         <li><strong>Hours Purchased:</strong> {{hours}}</li>
         <li><strong>Payment Method:</strong> {{paymentMethod}}</li>
         <li><strong>Date:</strong> {{date}}</li>
@@ -141,6 +150,263 @@ export class EmailService {
       from: this.configService.get('EMAIL_FROM'),
       to: this.configService.get('ADMIN_EMAIL'),
       subject: 'New Payment Received - Spicy Spanish',
+      html,
+    });
+  }
+
+  async sendClassConfirmationEmail(appointment: Appointment): Promise<void> {
+    const student = appointment.student;
+    const tutor = appointment.tutor;
+    
+    const template = `
+      <h1>Spanish Class Confirmation</h1>
+      <p>Hello {{studentName}},</p>
+      <p>Your Spanish class has been scheduled successfully:</p>
+      <ul>
+        <li><strong>Tutor:</strong> {{tutorName}}</li>
+        <li><strong>Date:</strong> {{date}}</li>
+        <li><strong>Start Time:</strong> {{startTime}}</li>
+        <li><strong>End Time:</strong> {{endTime}}</li>
+        <li><strong>Duration:</strong> {{duration}} hour(s)</li>
+      </ul>
+      <p>You'll receive a reminder email before the class.</p>
+      <p>If you need to cancel or reschedule, please log in to your dashboard or contact us.</p>
+      <p>¡Hasta pronto!</p>
+    `;
+
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+    const durationHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+
+    const compiledTemplate = handlebars.compile(template);
+    const html = compiledTemplate({
+      studentName: student.firstName,
+      tutorName: tutor.fullName,
+      date: startTime.toLocaleDateString(),
+      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      duration: durationHours,
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: student.email,
+      subject: 'Your Spanish Class is Confirmed - Spicy Spanish',
+      html,
+    });
+
+    // Also send notification to the tutor
+    const tutorTemplate = `
+      <h1>New Class Scheduled</h1>
+      <p>Hello {{tutorName}},</p>
+      <p>A new Spanish class has been scheduled with you:</p>
+      <ul>
+        <li><strong>Student:</strong> {{studentName}}</li>
+        <li><strong>Date:</strong> {{date}}</li>
+        <li><strong>Start Time:</strong> {{startTime}}</li>
+        <li><strong>End Time:</strong> {{endTime}}</li>
+        <li><strong>Duration:</strong> {{duration}} hour(s)</li>
+      </ul>
+      <p>Please log in to your dashboard to view the details.</p>
+      <p>¡Hasta pronto!</p>
+    `;
+
+    const compiledTutorTemplate = handlebars.compile(tutorTemplate);
+    const tutorHtml = compiledTutorTemplate({
+      tutorName: tutor.firstName,
+      studentName: student.fullName,
+      date: startTime.toLocaleDateString(),
+      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      duration: durationHours,
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: tutor.email,
+      subject: 'New Spanish Class Scheduled - Spicy Spanish',
+      html: tutorHtml,
+    });
+  }
+
+  async sendClassCancellationEmail(appointment: Appointment): Promise<void> {
+    const student = appointment.student;
+    const tutor = appointment.tutor;
+    
+    const template = `
+      <h1>Spanish Class Cancellation</h1>
+      <p>Hello {{recipientName}},</p>
+      <p>Your Spanish class has been cancelled:</p>
+      <ul>
+        <li><strong>With:</strong> {{otherPartyName}}</li>
+        <li><strong>Date:</strong> {{date}}</li>
+        <li><strong>Start Time:</strong> {{startTime}}</li>
+        <li><strong>End Time:</strong> {{endTime}}</li>
+      </ul>
+      <p>You can log in to your dashboard to schedule a new class.</p>
+      <p>If you have any questions, please contact us.</p>
+    `;
+
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+
+    // Send to student
+    const studentHtml = handlebars.compile(template)({
+      recipientName: student.firstName,
+      otherPartyName: tutor.fullName,
+      date: startTime.toLocaleDateString(),
+      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: student.email,
+      subject: 'Spanish Class Cancellation - Spicy Spanish',
+      html: studentHtml,
+    });
+
+    // Send to tutor
+    const tutorHtml = handlebars.compile(template)({
+      recipientName: tutor.firstName,
+      otherPartyName: student.fullName,
+      date: startTime.toLocaleDateString(),
+      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: tutor.email,
+      subject: 'Spanish Class Cancellation - Spicy Spanish',
+      html: tutorHtml,
+    });
+  }
+
+  // Scheduled task that runs every 5 minutes to check for upcoming appointments
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async sendScheduledReminders(): Promise<void> {
+    try {
+      this.logger.log('Running scheduled email reminders check');
+      
+      // Get appointments starting in the next hour
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      const reminder = await this.findUpcomingAppointmentsForReminder(now, oneHourFromNow);
+      
+      if (reminder.length > 0) {
+        this.logger.log(`Sending reminders for ${reminder.length} upcoming appointments`);
+        
+        for (const appointment of reminder) {
+          try {
+            await this.sendClassReminder(appointment);
+            await this.markReminderSent(appointment.id);
+            this.logger.log(`Sent reminder for appointment ${appointment.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to send reminder for appointment ${appointment.id}: ${error.message}`);
+          }
+        }
+      }
+      
+      // Get appointments for 24 hour reminder
+      const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const dayBefore = await this.findUpcomingAppointmentsForDayBeforeReminder(now, oneDayFromNow);
+      
+      if (dayBefore.length > 0) {
+        this.logger.log(`Sending day-before reminders for ${dayBefore.length} appointments`);
+        
+        for (const appointment of dayBefore) {
+          try {
+            await this.sendDayBeforeReminder(appointment);
+            await this.markDayBeforeReminderSent(appointment.id);
+            this.logger.log(`Sent day-before reminder for appointment ${appointment.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to send day-before reminder for appointment ${appointment.id}: ${error.message}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error in scheduled reminder: ${error.message}`);
+    }
+  }
+
+  // Method to find appointments that need reminders sent
+  private async findUpcomingAppointmentsForReminder(now: Date, cutoff: Date): Promise<Appointment[]> {
+    return this.appointmentRepository.find({
+      startTime: { $gte: now, $lte: cutoff },
+      status: AppointmentStatus.SCHEDULED,
+      reminderSent: false,
+    }, {
+      populate: ['student', 'tutor'],
+    });
+  }
+
+  // Method to find appointments that need day-before reminders sent
+  private async findUpcomingAppointmentsForDayBeforeReminder(now: Date, cutoff: Date): Promise<Appointment[]> {
+    return this.appointmentRepository.find({
+      startTime: { $gte: now, $lte: cutoff },
+      status: AppointmentStatus.SCHEDULED,
+      dayBeforeReminderSent: false,
+    }, {
+      populate: ['student', 'tutor'],
+    });
+  }
+  
+  // Mark reminder as sent in the database
+  private async markReminderSent(appointmentId: string): Promise<void> {
+    const appointment = await this.appointmentRepository.findOne({ id: appointmentId });
+    if (appointment) {
+      appointment.reminderSent = true;
+      appointment.reminderSentAt = new Date();
+      await this.em.flush();
+    }
+  }
+  
+  // Mark day-before reminder as sent in the database
+  private async markDayBeforeReminderSent(appointmentId: string): Promise<void> {
+    const appointment = await this.appointmentRepository.findOne({ id: appointmentId });
+    if (appointment) {
+      appointment.dayBeforeReminderSent = true;
+      appointment.dayBeforeReminderSentAt = new Date();
+      await this.em.flush();
+    }
+  }
+  
+  async sendDayBeforeReminder(appointment: Appointment): Promise<void> {
+    const student = appointment.student;
+    const tutor = appointment.tutor;
+    
+    const template = `
+      <h1>Reminder: Your Spanish Class Tomorrow</h1>
+      <p>Hello {{studentName}},</p>
+      <p>This is a friendly reminder that you have a Spanish class scheduled for tomorrow:</p>
+      <ul>
+        <li><strong>Tutor:</strong> {{tutorName}}</li>
+        <li><strong>Date:</strong> {{date}}</li>
+        <li><strong>Start Time:</strong> {{startTime}}</li>
+        <li><strong>End Time:</strong> {{endTime}}</li>
+      </ul>
+      <p>Please make sure you're prepared for your lesson.</p>
+      <p>If you need to reschedule, please contact us as soon as possible.</p>
+      <p>¡Hasta mañana!</p>
+    `;
+
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+
+    const compiledTemplate = handlebars.compile(template);
+    const html = compiledTemplate({
+      studentName: student.firstName,
+      tutorName: tutor.fullName,
+      date: startTime.toLocaleDateString(),
+      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: student.email,
+      subject: 'Reminder: Your Spanish Class Tomorrow - Spicy Spanish',
       html,
     });
   }

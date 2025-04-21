@@ -5,9 +5,13 @@ import { Appointment } from './entities/appointment.entity';
 import { User } from '../users/entities/user.entity';
 import { SchedulingController } from './scheduling.controller';
 import { SchedulingService } from './scheduling.service';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Availability, Appointment, User])],
+  imports: [
+    MikroOrmModule.forFeature([Availability, Appointment, User]),
+    EmailModule,
+  ],
   controllers: [SchedulingController],
   providers: [SchedulingService],
   exports: [SchedulingService],

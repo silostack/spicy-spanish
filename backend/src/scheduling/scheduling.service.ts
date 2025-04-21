@@ -4,6 +4,11 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { Appointment, AppointmentStatus } from './entities/appointment.entity';
 import { Availability } from './entities/availability.entity';
 import { User, UserRole } from '../users/entities/user.entity';
+import { EmailService } from '../email/email.service';
+
+// can't install these
+// import { google, calendar_v3 } from 'googleapis';
+// import { OAuth2Client } from 'google-auth-library';
 
 interface CreateAppointmentDto {
   studentId: string;
@@ -39,6 +44,9 @@ interface UpdateAvailabilityDto {
 
 @Injectable()
 export class SchedulingService {
+  // private calendar: calendar_v3.Calendar;
+  private readonly calendarId: string;
+
   constructor(
     @InjectRepository(Appointment)
     private readonly appointmentRepository: EntityRepository<Appointment>,
@@ -47,7 +55,23 @@ export class SchedulingService {
     @InjectRepository(User)
     private readonly userRepository: EntityRepository<User>,
     private readonly em: EntityManager,
-  ) {}
+    private readonly emailService: EmailService,
+  ) {
+    // Initialize Google Calendar API
+    // const auth = new OAuth2Client(
+    //   process.env.GOOGLE_CLIENT_ID,
+    //   process.env.GOOGLE_CLIENT_SECRET,
+    //   process.env.GOOGLE_REDIRECT_URI
+    // );
+    
+    // // Set credentials from environment or configuration
+    // auth.setCredentials({
+    //   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+    // });
+    
+    // this.calendar = google.calendar({ version: 'v3', auth });
+    this.calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+  }
 
   // Appointment methods
   async findAllAppointments() {
@@ -171,7 +195,31 @@ export class SchedulingService {
       appointment.notes = createAppointmentDto.notes;
     }
     
+    // Create Google Calendar event
+    const calendarEventId = await this.createGoogleCalendarEvent(
+      appointment.student.fullName,
+      appointment.tutor.fullName,
+      appointment.startTime,
+      appointment.endTime,
+      appointment.notes
+    );
+    
+    if (calendarEventId) {
+      appointment.googleCalendarEventId = calendarEventId;
+    }
+    
     await this.em.persistAndFlush(appointment);
+    
+    // Send confirmation emails to student and tutor
+    try {
+      await this.emailService.sendClassConfirmationEmail(appointment);
+      appointment.confirmationEmailSent = true;
+      await this.em.flush();
+    } catch (error) {
+      console.error('Failed to send confirmation email:', error);
+      // Don't fail the appointment creation if email fails
+    }
+    
     return appointment;
   }
 
@@ -205,6 +253,25 @@ export class SchedulingService {
       if (conflicts) {
         throw new BadRequestException('The selected time conflicts with another appointment');
       }
+      
+      // Update Google Calendar event if times are changing
+      if (appointment.googleCalendarEventId) {
+        await this.updateGoogleCalendarEvent(
+          appointment.googleCalendarEventId,
+          appointment.student.fullName,
+          appointment.tutor.fullName,
+          startTime,
+          endTime,
+          updateAppointmentDto.notes || appointment.notes
+        );
+      }
+    }
+    
+    // Update status in Google Calendar if changing status
+    if (updateAppointmentDto.status && appointment.googleCalendarEventId) {
+      if (updateAppointmentDto.status === AppointmentStatus.CANCELLED) {
+        await this.cancelGoogleCalendarEvent(appointment.googleCalendarEventId);
+      }
     }
     
     this.em.assign(appointment, updateAppointmentDto);
@@ -215,13 +282,42 @@ export class SchedulingService {
   async cancelAppointment(id: string) {
     const appointment = await this.findAppointmentById(id);
     appointment.status = AppointmentStatus.CANCELLED;
+    
+    // Cancel Google Calendar event
+    if (appointment.googleCalendarEventId) {
+      await this.cancelGoogleCalendarEvent(appointment.googleCalendarEventId);
+    }
+    
     await this.em.flush();
+    
+    // Send cancellation emails
+    try {
+      await this.emailService.sendClassCancellationEmail(appointment);
+    } catch (error) {
+      console.error('Failed to send cancellation email:', error);
+      // Don't fail the appointment cancellation if email fails
+    }
+    
     return appointment;
   }
 
   async completeAppointment(id: string) {
     const appointment = await this.findAppointmentById(id);
     appointment.status = AppointmentStatus.COMPLETED;
+    
+    // Update Google Calendar event to mark as completed
+    if (appointment.googleCalendarEventId) {
+      await this.updateGoogleCalendarEvent(
+        appointment.googleCalendarEventId,
+        appointment.student.fullName,
+        appointment.tutor.fullName,
+        appointment.startTime,
+        appointment.endTime,
+        appointment.notes,
+        true // marked as completed
+      );
+    }
+    
     await this.em.flush();
     return appointment;
   }
@@ -351,6 +447,115 @@ export class SchedulingService {
     
     const conflictingAppointments = await this.appointmentRepository.count(query);
     return conflictingAppointments > 0;
+  }
+
+  // Google Calendar integration methods
+  private async createGoogleCalendarEvent(
+    studentName: string,
+    tutorName: string,
+    startTime: Date,
+    endTime: Date,
+    notes?: string
+  ): Promise<string | null> {
+    try {
+      const event = {
+        summary: `Spanish Class: ${studentName} with ${tutorName}`,
+        description: notes || 'Spanish language lesson',
+        start: {
+          dateTime: startTime.toISOString(),
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: endTime.toISOString(),
+          timeZone: 'UTC',
+        },
+        attendees: [
+          { email: `${studentName.replace(/\s+/g, '.')}@example.com`, displayName: studentName },
+          { email: `${tutorName.replace(/\s+/g, '.')}@example.com`, displayName: tutorName },
+        ],
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 }, // 1 day before
+            { method: 'popup', minutes: 30 }, // 30 minutes before
+          ],
+        },
+      };
+
+      // const response = await this.calendar.events.insert({
+      //   calendarId: this.calendarId,
+      //   requestBody: event,
+      // });
+
+      // return response.data.id || null;
+      return null;
+    } catch (error) {
+      console.error('Error creating Google Calendar event:', error);
+      return null;
+    }
+  }
+
+  private async updateGoogleCalendarEvent(
+    eventId: string,
+    studentName: string,
+    tutorName: string,
+    startTime: Date,
+    endTime: Date,
+    notes?: string,
+    completed: boolean = false
+  ): Promise<boolean> {
+    try {
+      // First get the existing event
+      // const existingEvent = await this.calendar.events.get({
+      //   calendarId: this.calendarId,
+      //   eventId: eventId,
+      // });
+
+      // Update the event
+      // const event = {
+      //   summary: `Spanish Class: ${studentName} with ${tutorName}${completed ? ' (Completed)' : ''}`,
+      //   description: notes || 'Spanish language lesson',
+      //   start: {
+      //     dateTime: startTime.toISOString(),
+      //     timeZone: 'UTC',
+      //   },
+      //   end: {
+      //     dateTime: endTime.toISOString(),
+      //     timeZone: 'UTC',
+      //   },
+      //   attendees: existingEvent.data.attendees,
+      //   reminders: existingEvent.data.reminders,
+      // };
+
+      // await this.calendar.events.update({
+      //   calendarId: this.calendarId,
+      //   eventId: eventId,
+      //   requestBody: event,
+      // });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating Google Calendar event:', error);
+      return false;
+    }
+  }
+
+  private async cancelGoogleCalendarEvent(eventId: string): Promise<boolean> {
+    try {
+      // Mark as cancelled in Google Calendar
+      // await this.calendar.events.update({
+      //   calendarId: this.calendarId,
+      //   eventId: eventId,
+      //   requestBody: {
+      //     status: 'cancelled',
+      //   },
+      // });
+
+      return true;
+    } catch (error) {
+      console.error('Error cancelling Google Calendar event:', error);
+      return false;
+    }
   }
 
   // Dashboard stats

@@ -50,6 +50,12 @@ export class User {
   @Property({ nullable: true })
   resetPasswordExpires?: Date;
 
+  @Property({ nullable: true })
+  stripeCustomerId?: string;
+
+  @Property({ nullable: true })
+  googleCalendarId?: string;
+
   @Property()
   createdAt: Date = new Date();
 

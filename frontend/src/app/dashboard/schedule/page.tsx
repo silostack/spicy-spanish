@@ -2,372 +2,148 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '../../utils/api';
-
-interface Appointment {
-  id: string;
-  student: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  tutor: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-  startTime: string;
-  endTime: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
-  notes?: string;
-}
-
-interface Tutor {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-}
-
-interface Availability {
-  id: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  isRecurring: boolean;
-  specificDate?: string;
-}
-
-interface TimeSlot {
-  startTime: string;
-  endTime: string;
-  tutorId: string;
-  tutorName: string;
-}
+import { useAuth, useScheduling, useApp } from '../../contexts';
 
 export default function SchedulePage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [tutors, setTutors] = useState<Tutor[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { 
+    appointments, 
+    tutors, 
+    availabilities,
+    selectedTutor,
+    selectedDay,
+    selectedTimeSlot,
+    isLoading,
+    error,
+    fetchTutors,
+    fetchAppointments,
+    fetchTutorAvailability,
+    selectTutor,
+    selectDay,
+    selectTimeSlot,
+    bookAppointment,
+    cancelAppointment
+  } = useScheduling();
+  const { addNotification } = useApp();
   
-  // Booking form state
+  // Local state
   const [showBookingForm, setShowBookingForm] = useState(false);
-  const [selectedTutor, setSelectedTutor] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [date, setDate] = useState('');
+  const [availableSlots, setAvailableSlots] = useState<{startTime: string, endTime: string}[]>([]);
   
   // View appointment details modal
   const [showAppointmentDetails, setShowAppointmentDetails] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
 
   useEffect(() => {
-    // Get the user from localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        
-        if (parsedUser.role === 'student') {
-          fetchStudentAppointments(parsedUser.id);
-          fetchAllTutors();
-        } else if (parsedUser.role === 'tutor') {
-          fetchTutorAppointments(parsedUser.id);
-        } else if (parsedUser.role === 'admin') {
-          fetchAllAppointments();
-          fetchAllTutors();
-        } else {
-          setError('Invalid user role');
-          setLoading(false);
-        }
-      } catch (e) {
-        console.error('Error parsing user data', e);
-        setError('Error loading user data');
-        setLoading(false);
+    if (user) {
+      fetchAppointments();
+      if (user.role === 'student' || user.role === 'admin') {
+        fetchTutors();
       }
     } else {
       router.push('/login');
     }
-  }, [router]);
+  }, [user, router]);
 
-  const fetchStudentAppointments = async (studentId: string) => {
-    try {
-      const response = await api.get(`/scheduling/students/${studentId}/appointments`);
-      setAppointments(response.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching student appointments:', error);
-      setError('Failed to load appointments');
-      setLoading(false);
-      
-      // Fallback mock data
-      setAppointments([
-        {
-          id: '1',
-          student: {
-            id: studentId,
-            firstName: 'John',
-            lastName: 'Smith',
-            email: 'john.smith@example.com'
-          },
-          tutor: {
-            id: '101',
-            firstName: 'Maria',
-            lastName: 'Garcia',
-            email: 'maria.garcia@example.com'
-          },
-          startTime: '2025-04-15T14:00:00Z',
-          endTime: '2025-04-15T15:00:00Z',
-          status: 'scheduled'
-        },
-        {
-          id: '2',
-          student: {
-            id: studentId,
-            firstName: 'John',
-            lastName: 'Smith',
-            email: 'john.smith@example.com'
-          },
-          tutor: {
-            id: '102',
-            firstName: 'Carlos',
-            lastName: 'Rodriguez',
-            email: 'carlos.r@example.com'
-          },
-          startTime: '2025-04-17T15:30:00Z',
-          endTime: '2025-04-17T17:00:00Z',
-          status: 'scheduled'
-        }
-      ]);
-      setLoading(false);
-      setError(null);
-    }
-  };
-
-  const fetchTutorAppointments = async (tutorId: string) => {
-    try {
-      const response = await api.get(`/scheduling/tutors/${tutorId}/appointments`);
-      setAppointments(response.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching tutor appointments:', error);
-      setError('Failed to load appointments');
-      setLoading(false);
-      
-      // Fallback mock data
-      setAppointments([
-        {
-          id: '1',
-          student: {
-            id: '201',
-            firstName: 'John',
-            lastName: 'Smith',
-            email: 'john.smith@example.com'
-          },
-          tutor: {
-            id: tutorId,
-            firstName: 'Maria',
-            lastName: 'Garcia',
-            email: 'maria.garcia@example.com'
-          },
-          startTime: '2025-04-15T14:00:00Z',
-          endTime: '2025-04-15T15:00:00Z',
-          status: 'scheduled'
-        },
-        {
-          id: '2',
-          student: {
-            id: '202',
-            firstName: 'Emily',
-            lastName: 'Johnson',
-            email: 'emily.j@example.com'
-          },
-          tutor: {
-            id: tutorId,
-            firstName: 'Maria',
-            lastName: 'Garcia',
-            email: 'maria.garcia@example.com'
-          },
-          startTime: '2025-04-16T10:00:00Z',
-          endTime: '2025-04-16T11:30:00Z',
-          status: 'scheduled'
-        }
-      ]);
-      setLoading(false);
-      setError(null);
-    }
-  };
-
-  const fetchAllAppointments = async () => {
-    try {
-      const response = await api.get('/scheduling/appointments');
-      setAppointments(response.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching all appointments:', error);
-      setError('Failed to load appointments');
-      setLoading(false);
-    }
-  };
-
-  const fetchAllTutors = async () => {
-    try {
-      const response = await api.get('/users/tutors');
-      setTutors(response.data.items || response.data);
-    } catch (error) {
-      console.error('Error fetching tutors:', error);
-      
-      // Fallback mock data
-      setTutors([
-        {
-          id: '101',
-          firstName: 'Maria',
-          lastName: 'Garcia',
-          email: 'maria.garcia@example.com'
-        },
-        {
-          id: '102',
-          firstName: 'Carlos',
-          lastName: 'Rodriguez',
-          email: 'carlos.r@example.com'
-        }
-      ]);
-    }
-  };
-
-  const handleTutorChange = async (tutorId: string) => {
-    setSelectedTutor(tutorId);
-    setSelectedTimeSlot('');
-    
-    if (tutorId && selectedDate) {
-      await fetchAvailableTimeSlots(tutorId, selectedDate);
-    }
-  };
-
-  const handleDateChange = async (date: string) => {
-    setSelectedDate(date);
-    setSelectedTimeSlot('');
-    
+  useEffect(() => {
     if (selectedTutor && date) {
-      await fetchAvailableTimeSlots(selectedTutor, date);
+      generateAvailableTimeSlots();
     }
+  }, [selectedTutor, date, availabilities]);
+
+  const handleTutorChange = (tutorId: string) => {
+    selectTutor({ id: tutorId });
+    if (tutorId) {
+      fetchTutorAvailability(tutorId);
+    }
+    setAvailableSlots([]);
   };
 
-  const fetchAvailableTimeSlots = async (tutorId: string, date: string) => {
-    try {
-      const response = await api.get(`/scheduling/tutors/${tutorId}/availability`);
-      const availabilities: Availability[] = response.data;
-      
-      // Calculate available time slots based on tutor's availability and existing appointments
-      const selectedDay = new Date(date).getDay();
-      const formattedDate = date.split('T')[0]; // Get just the date part
-      
-      const matchingAvailabilities = availabilities.filter(a => 
-        (a.isRecurring && a.dayOfWeek === selectedDay) || 
-        (!a.isRecurring && a.specificDate && a.specificDate.startsWith(formattedDate))
-      );
-      
-      if (matchingAvailabilities.length === 0) {
-        setAvailableSlots([]);
-        return;
-      }
-      
-      // Generate time slots in 30-minute increments based on availability
-      const slots: TimeSlot[] = [];
-      const tutor = tutors.find(t => t.id === tutorId);
-      const tutorName = tutor ? `${tutor.firstName} ${tutor.lastName}` : 'Unknown Tutor';
-      
-      matchingAvailabilities.forEach(availability => {
-        const [startHour, startMinute] = availability.startTime.split(':').map(Number);
-        const [endHour, endMinute] = availability.endTime.split(':').map(Number);
-        
-        const startDate = new Date(date);
-        startDate.setHours(startHour, startMinute, 0, 0);
-        
-        const endDate = new Date(date);
-        endDate.setHours(endHour, endMinute, 0, 0);
-        
-        // Generate slots in 30-minute increments
-        const slotDuration = 30; // minutes
-        let currentSlotStart = new Date(startDate);
-        
-        while (currentSlotStart.getTime() + slotDuration * 60 * 1000 <= endDate.getTime()) {
-          const slotStart = new Date(currentSlotStart);
-          const slotEnd = new Date(currentSlotStart.getTime() + 60 * 60 * 1000); // 1 hour
-          
-          // Don't add slots that end after the availability end time
-          if (slotEnd.getTime() <= endDate.getTime()) {
-            slots.push({
-              startTime: slotStart.toISOString(),
-              endTime: slotEnd.toISOString(),
-              tutorId,
-              tutorName
-            });
-          }
-          
-          // Move to next slot
-          currentSlotStart.setMinutes(currentSlotStart.getMinutes() + slotDuration);
-        }
-      });
-      
-      // Remove slots that conflict with existing appointments
-      const tutorAppointmentsResponse = await api.get(`/scheduling/tutors/${tutorId}/appointments`);
-      const tutorAppointments: Appointment[] = tutorAppointmentsResponse.data;
-      
-      const filteredSlots = slots.filter(slot => {
-        const slotStart = new Date(slot.startTime).getTime();
-        const slotEnd = new Date(slot.endTime).getTime();
-        
-        // Check if this slot conflicts with any existing appointment
-        return !tutorAppointments.some(appointment => {
-          const appointmentStart = new Date(appointment.startTime).getTime();
-          const appointmentEnd = new Date(appointment.endTime).getTime();
-          
-          // Check for overlap
-          return (
-            (slotStart >= appointmentStart && slotStart < appointmentEnd) || // Slot starts during appointment
-            (slotEnd > appointmentStart && slotEnd <= appointmentEnd) || // Slot ends during appointment
-            (slotStart <= appointmentStart && slotEnd >= appointmentEnd) // Slot contains appointment
-          );
-        });
-      });
-      
-      setAvailableSlots(filteredSlots);
-    } catch (error) {
-      console.error('Error fetching available time slots:', error);
-      
-      // Fallback mock data for demonstration
-      const tutor = tutors.find(t => t.id === tutorId);
-      const tutorName = tutor ? `${tutor.firstName} ${tutor.lastName}` : 'Unknown Tutor';
-      const dateObj = new Date(date);
-      
-      // Generate mock slots
-      const mockSlots = [];
-      for (let hour = 9; hour < 17; hour++) {
-        const slotStart = new Date(dateObj);
-        slotStart.setHours(hour, 0, 0, 0);
-        
-        const slotEnd = new Date(dateObj);
-        slotEnd.setHours(hour + 1, 0, 0, 0);
-        
-        mockSlots.push({
-          startTime: slotStart.toISOString(),
-          endTime: slotEnd.toISOString(),
-          tutorId,
-          tutorName
-        });
-      }
-      
-      setAvailableSlots(mockSlots);
+  const handleDateChange = (dateStr: string) => {
+    setDate(dateStr);
+    const selectedDate = new Date(dateStr);
+    selectDay(selectedDate);
+    setAvailableSlots([]);
+  };
+
+  const generateAvailableTimeSlots = () => {
+    const selectedDate = new Date(date);
+    const dayOfWeek = selectedDate.getDay(); // 0-6 (Sunday-Saturday)
+    
+    // Filter availabilities for this day
+    const dayAvailabilities = availabilities.filter(avail => 
+      (avail.isRecurring && avail.dayOfWeek === dayOfWeek) ||
+      (!avail.isRecurring && avail.specificDate && new Date(avail.specificDate).toDateString() === selectedDate.toDateString())
+    );
+    
+    if (dayAvailabilities.length === 0) {
+      setAvailableSlots([]);
+      return;
     }
+    
+    // Generate time slots in 30-minute increments based on availability
+    const slots: {startTime: string, endTime: string}[] = [];
+    
+    dayAvailabilities.forEach(availability => {
+      const [startHour, startMinute] = availability.startTime.split(':').map(Number);
+      const [endHour, endMinute] = availability.endTime.split(':').map(Number);
+      
+      const startDate = new Date(selectedDate);
+      startDate.setHours(startHour, startMinute, 0, 0);
+      
+      const endDate = new Date(selectedDate);
+      endDate.setHours(endHour, endMinute, 0, 0);
+      
+      // Generate slots in 30-minute increments
+      const slotDuration = 30; // minutes
+      let currentSlotStart = new Date(startDate);
+      
+      while (currentSlotStart.getTime() + slotDuration * 60 * 1000 <= endDate.getTime()) {
+        const slotStart = new Date(currentSlotStart);
+        const slotEnd = new Date(currentSlotStart.getTime() + 60 * 60 * 1000); // 1 hour lessons
+        
+        // Don't add slots that end after the availability end time
+        if (slotEnd.getTime() <= endDate.getTime()) {
+          slots.push({
+            startTime: slotStart.toISOString(),
+            endTime: slotEnd.toISOString()
+          });
+        }
+        
+        // Move to next slot
+        currentSlotStart.setMinutes(currentSlotStart.getMinutes() + slotDuration);
+      }
+    });
+    
+    // Filter out slots that conflict with existing appointments
+    const tutorId = selectedTutor?.id;
+    const filteredSlots = slots.filter(slot => {
+      const slotStart = new Date(slot.startTime).getTime();
+      const slotEnd = new Date(slot.endTime).getTime();
+      
+      // Check if this slot conflicts with any existing appointment
+      return !appointments.some(appointment => {
+        if (appointment.tutor.id !== tutorId || appointment.status === 'cancelled') {
+          return false;
+        }
+        
+        const appointmentStart = new Date(appointment.startTime).getTime();
+        const appointmentEnd = new Date(appointment.endTime).getTime();
+        
+        // Check for overlap
+        return (
+          (slotStart >= appointmentStart && slotStart < appointmentEnd) || // Slot starts during appointment
+          (slotEnd > appointmentStart && slotEnd <= appointmentEnd) || // Slot ends during appointment
+          (slotStart <= appointmentStart && slotEnd >= appointmentEnd) // Slot contains appointment
+        );
+      });
+    });
+    
+    setAvailableSlots(filteredSlots);
   };
 
   const handleBookAppointment = async () => {
@@ -376,76 +152,51 @@ export default function SchedulePage() {
       return;
     }
     
-    const [startTime, endTime] = selectedTimeSlot.split('|');
-    
     try {
-      await api.post('/scheduling/appointments', {
-        studentId: user.id,
-        tutorId: selectedTutor,
-        startTime,
-        endTime,
-        notes: bookingNotes || undefined
-      });
+      await bookAppointment(bookingNotes);
       
-      // Refresh appointments
-      if (user.role === 'student') {
-        fetchStudentAppointments(user.id);
-      }
-      
-      // Reset form
-      setSelectedTutor('');
-      setSelectedDate('');
-      setSelectedTimeSlot('');
-      setBookingNotes('');
+      // Reset form and close modal
       setShowBookingForm(false);
+      setBookingNotes('');
+      setDate('');
       setBookingError(null);
+      
+      // Show success notification
+      addNotification({
+        message: 'Lesson booked successfully!',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Error booking appointment:', error);
       setBookingError('Failed to book appointment. Please try again.');
     }
   };
 
-  const handleCancelAppointment = async (appointmentId: string) => {
+  const handleCancelAppointmentClick = async (appointmentId: string) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
       try {
-        await api.patch(`/scheduling/appointments/${appointmentId}/cancel`);
+        await cancelAppointment(appointmentId);
         
-        // Refresh appointments
-        if (user.role === 'student') {
-          fetchStudentAppointments(user.id);
-        } else if (user.role === 'tutor') {
-          fetchTutorAppointments(user.id);
-        } else if (user.role === 'admin') {
-          fetchAllAppointments();
+        if (showAppointmentDetails) {
+          setShowAppointmentDetails(false);
         }
+        
+        // Show success notification
+        addNotification({
+          message: 'Lesson cancelled successfully',
+          type: 'success'
+        });
       } catch (error) {
         console.error('Error cancelling appointment:', error);
-        setError('Failed to cancel appointment');
+        addNotification({
+          message: 'Failed to cancel lesson',
+          type: 'error'
+        });
       }
     }
   };
 
-  const handleCompleteAppointment = async (appointmentId: string) => {
-    if (window.confirm('Mark this appointment as completed?')) {
-      try {
-        await api.patch(`/scheduling/appointments/${appointmentId}/complete`);
-        
-        // Refresh appointments
-        if (user.role === 'student') {
-          fetchStudentAppointments(user.id);
-        } else if (user.role === 'tutor') {
-          fetchTutorAppointments(user.id);
-        } else if (user.role === 'admin') {
-          fetchAllAppointments();
-        }
-      } catch (error) {
-        console.error('Error completing appointment:', error);
-        setError('Failed to mark appointment as completed');
-      }
-    }
-  };
-
-  const handleViewAppointmentDetails = (appointment: Appointment) => {
+  const handleViewAppointmentDetails = (appointment: any) => {
     setSelectedAppointment(appointment);
     setShowAppointmentDetails(true);
   };
@@ -482,7 +233,7 @@ export default function SchedulePage() {
     return `${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''}`;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
@@ -520,18 +271,18 @@ export default function SchedulePage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-spicy-dark">
-            {user.role === 'admin' ? 'All Appointments' : 'My Schedule'}
+            {user?.role === 'admin' ? 'All Appointments' : 'My Schedule'}
           </h1>
           <p className="text-gray-600">
-            {user.role === 'student' 
+            {user?.role === 'student' 
               ? 'Book and manage your Spanish lessons' 
-              : user.role === 'tutor'
+              : user?.role === 'tutor'
               ? 'View and manage your teaching schedule'
               : 'View and manage all appointments'}
           </p>
         </div>
         
-        {user.role === 'student' && (
+        {user?.role === 'student' && (
           <button
             onClick={() => setShowBookingForm(true)}
             className="bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
@@ -562,12 +313,12 @@ export default function SchedulePage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date & Time
                   </th>
-                  {(user.role === 'admin' || user.role === 'tutor') && (
+                  {(user?.role === 'admin' || user?.role === 'tutor') && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Student
                     </th>
                   )}
-                  {(user.role === 'admin' || user.role === 'student') && (
+                  {(user?.role === 'admin' || user?.role === 'student') && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tutor
                     </th>
@@ -586,12 +337,12 @@ export default function SchedulePage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {formatDateTime(appointment.startTime)}
                     </td>
-                    {(user.role === 'admin' || user.role === 'tutor') && (
+                    {(user?.role === 'admin' || user?.role === 'tutor') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {appointment.student.firstName} {appointment.student.lastName}
                       </td>
                     )}
-                    {(user.role === 'admin' || user.role === 'student') && (
+                    {(user?.role === 'admin' || user?.role === 'student') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {appointment.tutor.firstName} {appointment.tutor.lastName}
                       </td>
@@ -607,32 +358,12 @@ export default function SchedulePage() {
                         >
                           Details
                         </button>
-                        {/* Students and admins can cancel any appointment */}
-                        {(user.role === 'student' || user.role === 'admin') && (
-                          <button
-                            onClick={() => handleCancelAppointment(appointment.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        {/* Tutors can complete and cancel appointments */}
-                        {user.role === 'tutor' && (
-                          <>
-                            <button
-                              onClick={() => handleCancelAppointment(appointment.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => handleCompleteAppointment(appointment.id)}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Complete
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => handleCancelAppointmentClick(appointment.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -643,13 +374,13 @@ export default function SchedulePage() {
         ) : (
           <div className="text-center py-8">
             <p className="text-gray-600 mb-4">
-              {user.role === 'student' 
+              {user?.role === 'student' 
                 ? "You don't have any upcoming lessons scheduled." 
-                : user.role === 'tutor'
+                : user?.role === 'tutor'
                 ? "You don't have any upcoming lessons scheduled."
                 : "There are no upcoming lessons scheduled."}
             </p>
-            {user.role === 'student' && (
+            {user?.role === 'student' && (
               <button
                 onClick={() => setShowBookingForm(true)}
                 className="bg-spicy-red hover:bg-spicy-orange text-white font-medium py-2 px-4 rounded-lg"
@@ -673,12 +404,12 @@ export default function SchedulePage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date & Time
                   </th>
-                  {(user.role === 'admin' || user.role === 'tutor') && (
+                  {(user?.role === 'admin' || user?.role === 'tutor') && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Student
                     </th>
                   )}
-                  {(user.role === 'admin' || user.role === 'student') && (
+                  {(user?.role === 'admin' || user?.role === 'student') && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tutor
                     </th>
@@ -700,12 +431,12 @@ export default function SchedulePage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {formatDateTime(appointment.startTime)}
                     </td>
-                    {(user.role === 'admin' || user.role === 'tutor') && (
+                    {(user?.role === 'admin' || user?.role === 'tutor') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {appointment.student.firstName} {appointment.student.lastName}
                       </td>
                     )}
-                    {(user.role === 'admin' || user.role === 'student') && (
+                    {(user?.role === 'admin' || user?.role === 'student') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {appointment.tutor.firstName} {appointment.tutor.lastName}
                       </td>
@@ -761,7 +492,7 @@ export default function SchedulePage() {
                 </label>
                 <select
                   id="tutor"
-                  value={selectedTutor}
+                  value={selectedTutor?.id || ''}
                   onChange={(e) => handleTutorChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
                 >
@@ -781,7 +512,7 @@ export default function SchedulePage() {
                 <input
                   type="date"
                   id="date"
-                  value={selectedDate}
+                  value={date}
                   onChange={(e) => handleDateChange(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
@@ -797,9 +528,9 @@ export default function SchedulePage() {
                     {availableSlots.map((slot, index) => (
                       <button
                         key={index}
-                        onClick={() => setSelectedTimeSlot(`${slot.startTime}|${slot.endTime}`)}
+                        onClick={() => selectTimeSlot(slot)}
                         className={`py-2 px-3 text-sm font-medium rounded-md ${
-                          selectedTimeSlot === `${slot.startTime}|${slot.endTime}`
+                          selectedTimeSlot?.startTime === slot.startTime && selectedTimeSlot?.endTime === slot.endTime
                             ? 'bg-spicy-red text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
@@ -809,7 +540,7 @@ export default function SchedulePage() {
                     ))}
                   </div>
                 </div>
-              ) : selectedTutor && selectedDate ? (
+              ) : selectedTutor && date ? (
                 <div className="text-center py-4">
                   <p className="text-gray-600">No available time slots for this tutor on the selected date.</p>
                 </div>
@@ -924,42 +655,14 @@ export default function SchedulePage() {
               
               {selectedAppointment.status === 'scheduled' && new Date(selectedAppointment.startTime) > new Date() && (
                 <div className="flex justify-end space-x-3 mt-6">
-                  {/* Students and admins can cancel any appointment */}
-                  {(user.role === 'student' || user.role === 'admin') && (
-                    <button
-                      onClick={() => {
-                        handleCancelAppointment(selectedAppointment.id);
-                        setShowAppointmentDetails(false);
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                    >
-                      Cancel Lesson
-                    </button>
-                  )}
-                  
-                  {/* Tutors can cancel and complete appointments */}
-                  {user.role === 'tutor' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleCancelAppointment(selectedAppointment.id);
-                          setShowAppointmentDetails(false);
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                      >
-                        Cancel Lesson
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleCompleteAppointment(selectedAppointment.id);
-                          setShowAppointmentDetails(false);
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                      >
-                        Mark as Completed
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => {
+                      handleCancelAppointmentClick(selectedAppointment.id);
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  >
+                    Cancel Lesson
+                  </button>
                 </div>
               )}
             </div>

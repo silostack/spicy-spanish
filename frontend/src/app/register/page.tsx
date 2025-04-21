@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import MainLayout from '../components/MainLayout';
-import { authService, RegisterData } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -17,8 +17,15 @@ export default function Register() {
     phoneNumber: '',
   });
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { register, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    // Redirect if already authenticated
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,15 +33,6 @@ export default function Register() {
       ...prev,
       [name]: value,
     }));
-  };
-
-  const testConnection = async () => {
-    try {
-      const result = await authService.testConnection();
-      alert(`API Connection Test Success: ${JSON.stringify(result)}`);
-    } catch (error: any) {
-      alert(`API Connection Test Failed: ${error.message}`);
-    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -47,16 +45,15 @@ export default function Register() {
       return;
     }
 
-    setIsLoading(true);
-
     try {
       // Create registration data object
-      const registrationData: RegisterData = {
+      const registrationData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
         timezone: formData.timezone,
+        role: 'student',
       };
       
       // Only add phone number if it's not empty and valid
@@ -65,30 +62,16 @@ export default function Register() {
         const phoneNumber = formData.phoneNumber.startsWith('+') 
           ? formData.phoneNumber 
           : `+1${formData.phoneNumber}`; // Default to US format if no country code
-        registrationData.phoneNumber = phoneNumber;
+        Object.assign(registrationData, { phoneNumber });
       }
       
-      // Register student via API
-      await authService.registerStudent(registrationData);
+      // Register via Auth context
+      await register(registrationData);
       
-      // Redirect to login page after successful registration
-      router.push('/login?registered=true');
+      // Redirect will be handled by the auth context after successful registration
     } catch (err: any) {
-      console.error('Registration error details:', {
-        message: err.message,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        config: {
-          url: err.config?.url,
-          method: err.config?.method,
-          baseURL: err.config?.baseURL,
-          headers: err.config?.headers,
-        }
-      });
+      console.error('Registration error:', err);
       setError(err.response?.data?.message || `Error: ${err.message || 'An error occurred during registration. Please try again.'}`);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -202,11 +185,11 @@ export default function Register() {
 
               <button
                 type="submit"
-                className="w-full btn-primary flex justify-center items-center"
+                className="w-full bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg transition-colors"
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <span className="flex items-center">
+                  <span className="flex items-center justify-center">
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

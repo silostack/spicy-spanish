@@ -41,6 +41,21 @@ export class Appointment {
   @Property({ onUpdate: () => new Date() })
   updatedAt: Date = new Date();
 
+  @Property({ default: false })
+  reminderSent: boolean = false;
+  
+  @Property({ nullable: true })
+  reminderSentAt?: Date;
+  
+  @Property({ default: false })
+  dayBeforeReminderSent: boolean = false;
+  
+  @Property({ nullable: true })
+  dayBeforeReminderSentAt?: Date;
+  
+  @Property({ default: false })
+  confirmationEmailSent: boolean = false;
+
   constructor(
     student: User,
     tutor: User,

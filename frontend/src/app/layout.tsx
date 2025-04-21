@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Poppins, Montserrat } from 'next/font/google';
+import { AppContextProvider } from './contexts';
 import './globals.css';
 
 const poppins = Poppins({
@@ -29,7 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} ${montserrat.variable} font-sans min-h-screen w-full m-0 p-0`}>
-        {children}
+        <AppContextProvider>
+          {children}
+        </AppContextProvider>
       </body>
     </html>
   );
