@@ -2,14 +2,17 @@ import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Availability } from './entities/availability.entity';
 import { Appointment } from './entities/appointment.entity';
+import { Attendance } from './entities/attendance.entity';
+import { ClassReport } from './entities/class-report.entity';
 import { User } from '../users/entities/user.entity';
+import { Course } from '../courses/entities/course.entity';
 import { SchedulingController } from './scheduling.controller';
 import { SchedulingService } from './scheduling.service';
 import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
-    MikroOrmModule.forFeature([Availability, Appointment, User]),
+    MikroOrmModule.forFeature([Availability, Appointment, Attendance, ClassReport, User, Course]),
     EmailModule,
   ],
   controllers: [SchedulingController],

@@ -11,17 +11,21 @@ export default function SchedulePage() {
     appointments, 
     tutors, 
     availabilities,
+    courses,
     selectedTutor,
     selectedDay,
     selectedTimeSlot,
+    selectedCourse,
     isLoading,
     error,
     fetchTutors,
     fetchAppointments,
     fetchTutorAvailability,
+    fetchCourses,
     selectTutor,
     selectDay,
     selectTimeSlot,
+    selectCourse,
     bookAppointment,
     cancelAppointment
   } = useScheduling();
@@ -41,6 +45,7 @@ export default function SchedulePage() {
   useEffect(() => {
     if (user) {
       fetchAppointments();
+      fetchCourses();
       if (user.role === 'student' || user.role === 'admin') {
         fetchTutors();
       }
@@ -324,6 +329,9 @@ export default function SchedulePage() {
                     </th>
                   )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Course
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Duration
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -347,6 +355,12 @@ export default function SchedulePage() {
                         {appointment.tutor.firstName} {appointment.tutor.lastName}
                       </td>
                     )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {appointment.course ? 
+                        `${appointment.course.title} (${appointment.course.learningLevel.charAt(0).toUpperCase() + appointment.course.learningLevel.slice(1)})` 
+                        : 'No course assigned'
+                      }
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {calculateDuration(appointment.startTime, appointment.endTime)}
                     </td>
@@ -500,6 +514,25 @@ export default function SchedulePage() {
                   {tutors.map((tutor) => (
                     <option key={tutor.id} value={tutor.id}>
                       {tutor.firstName} {tutor.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="course" className="block text-sm font-medium text-gray-700 mb-1">
+                  Select a Course (Optional)
+                </label>
+                <select
+                  id="course"
+                  value={selectedCourse?.id || ''}
+                  onChange={(e) => selectCourse(e.target.value ? courses.find(c => c.id === e.target.value) || null : null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
+                >
+                  <option value="">-- Select Course (Optional) --</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.title} ({course.learningLevel.charAt(0).toUpperCase() + course.learningLevel.slice(1)})
                     </option>
                   ))}
                 </select>

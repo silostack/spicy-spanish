@@ -13,6 +13,13 @@ interface Student {
   lastActive?: string;
   availableHours?: number;
   coursesEnrolled?: number;
+  isActive?: boolean;
+  phoneNumber?: string;
+  timezone?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  profession?: string;
+  address?: string;
 }
 
 export default function StudentsPage() {
@@ -120,6 +127,17 @@ export default function StudentsPage() {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      await api.patch(`/users/${userId}`, { isActive: !currentStatus });
+      // Refresh the students list
+      fetchStudents();
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Failed to update user status');
+    }
   };
 
   if (loading && students.length === 0) {
@@ -305,15 +323,27 @@ export default function StudentsPage() {
                       {formatDate(student.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        student.lastActive && new Date(student.lastActive) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {student.lastActive && new Date(student.lastActive) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-                          ? 'Active'
-                          : 'Inactive'}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          student.isActive !== false
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {student.isActive !== false ? 'Active' : 'Inactive'}
+                        </span>
+                        {user.role === 'admin' && (
+                          <button
+                            onClick={() => toggleUserStatus(student.id, student.isActive !== false)}
+                            className={`text-xs px-2 py-1 rounded ${
+                              student.isActive !== false
+                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'bg-green-100 text-green-600 hover:bg-green-200'
+                            }`}
+                          >
+                            {student.isActive !== false ? 'Deactivate' : 'Activate'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {student.availableHours || 0} hours

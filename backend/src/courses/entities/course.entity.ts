@@ -1,7 +1,13 @@
-import { Entity, ManyToOne, PrimaryKey, Property, Collection, OneToMany } from '@mikro-orm/core';
+import { Entity, ManyToOne, PrimaryKey, Property, Collection, OneToMany, Enum } from '@mikro-orm/core';
 import { v4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
 import { CourseLesson } from './course-lesson.entity';
+
+export enum LearningLevel {
+  BEGINNER = 'beginner',
+  INTERMEDIATE = 'intermediate',
+  ADVANCED = 'advanced',
+}
 
 @Entity()
 export class Course {
@@ -13,6 +19,9 @@ export class Course {
 
   @Property({ type: 'text' })
   description: string;
+
+  @Enum(() => LearningLevel)
+  learningLevel: LearningLevel;
 
   @OneToMany(() => CourseLesson, lesson => lesson.course, { orphanRemoval: true })
   lessons = new Collection<CourseLesson>(this);
@@ -29,10 +38,12 @@ export class Course {
   constructor(
     title: string,
     description: string,
+    learningLevel: LearningLevel,
     isActive: boolean = true,
   ) {
     this.title = title;
     this.description = description;
+    this.learningLevel = learningLevel;
     this.isActive = isActive;
   }
 }

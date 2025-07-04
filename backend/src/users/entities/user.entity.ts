@@ -56,6 +56,24 @@ export class User {
   @Property({ nullable: true })
   googleCalendarId?: string;
 
+  @Property({ nullable: true })
+  dateOfBirth?: Date;
+
+  @Property({ nullable: true })
+  nationality?: string;
+
+  @Property({ nullable: true })
+  profession?: string;
+
+  @Property({ nullable: true })
+  address?: string;
+
+  @Property({ default: true })
+  isActive: boolean = true;
+
+  @Property({ nullable: true })
+  tutorExperience?: string;
+
   @Property()
   createdAt: Date = new Date();
 

@@ -1,20 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
+import { LearningLevel } from './entities/course.entity';
 
 // DTOs
 class CreateCourseDto {
   title: string;
   description: string;
+  learningLevel: LearningLevel;
   isActive?: boolean;
 }
 
 class UpdateCourseDto {
   title?: string;
   description?: string;
+  learningLevel?: LearningLevel;
   isActive?: boolean;
 }
 
@@ -51,6 +54,11 @@ export class CoursesController {
   @Get('active')
   findActiveCourses() {
     return this.coursesService.findActiveCourses();
+  }
+
+  @Get('level/:learningLevel')
+  findCoursesByLevel(@Param('learningLevel') learningLevel: LearningLevel) {
+    return this.coursesService.findCoursesByLevel(learningLevel);
   }
 
   @Get(':id')

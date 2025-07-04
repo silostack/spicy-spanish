@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '../../utils/api';
 
+type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
+
 interface Course {
   id: string;
   title: string;
   description: string;
-  level: string;
-  lessonsCount: number;
-  studentsCount: number;
+  learningLevel: LearningLevel;
+  lessonsCount?: number;
+  studentsCount?: number;
   createdAt: string;
   isActive: boolean;
 }
@@ -53,12 +55,14 @@ export default function CoursesPage() {
         },
       });
       
-      setCourses(response.data.items);
-      setTotalPages(Math.ceil(response.data.total / 10));
+      // Ensure courses is always an array
+      setCourses(response.data?.items || []);
+      setTotalPages(Math.ceil((response.data?.total || 0) / 10));
       setLoading(false);
     } catch (error) {
       console.error('Error fetching courses:', error);
       setError('Failed to load courses');
+      setCourses([]); // Reset to empty array on error
       setLoading(false);
     }
   };
@@ -274,7 +278,7 @@ export default function CoursesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {courses.length > 0 ? (
+                {courses && courses.length > 0 ? (
                   courses.map((course) => (
                     <tr key={course.id}>
                       <td className="px-6 py-4">
@@ -289,13 +293,13 @@ export default function CoursesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          course.level === 'Beginner' 
+                          course.learningLevel === 'beginner' 
                             ? 'bg-green-100 text-green-800' 
-                            : course.level === 'Intermediate'
+                            : course.learningLevel === 'intermediate'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {course.level}
+                          {course.learningLevel.charAt(0).toUpperCase() + course.learningLevel.slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -345,7 +349,7 @@ export default function CoursesPage() {
       ) : (
         // Student/Tutor view - Grid
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {courses.length > 0 ? (
+          {courses && courses.length > 0 ? (
             courses.map((course) => (
               <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="h-20 bg-spicy-red flex items-center justify-center">
@@ -357,13 +361,13 @@ export default function CoursesPage() {
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-spicy-dark">{course.title}</h3>
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      course.level === 'Beginner' 
+                      course.learningLevel === 'beginner' 
                         ? 'bg-green-100 text-green-800' 
-                        : course.level === 'Intermediate'
+                        : course.learningLevel === 'intermediate'
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {course.level}
+                      {course.learningLevel.charAt(0).toUpperCase() + course.learningLevel.slice(1)}
                     </span>
                   </div>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-3">{course.description}</p>

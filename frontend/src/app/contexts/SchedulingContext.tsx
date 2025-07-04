@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api } from '../utils/api';
+import api from '../utils/api';
 import { useAuth } from './AuthContext';
 import { useApp } from './AppContext';
 
@@ -24,6 +24,13 @@ interface Availability {
   specificDate?: string;
 }
 
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  learningLevel: 'beginner' | 'intermediate' | 'advanced';
+}
+
 interface Appointment {
   id: string;
   student: {
@@ -38,6 +45,7 @@ interface Appointment {
     lastName: string;
     email: string;
   };
+  course?: Course;
   startTime: string;
   endTime: string;
   status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
@@ -49,17 +57,21 @@ interface SchedulingContextType {
   tutors: Tutor[];
   availabilities: Availability[];
   appointments: Appointment[];
+  courses: Course[];
   selectedTutor: Tutor | null;
   selectedDay: Date | null;
   selectedTimeSlot: { start: string; end: string } | null;
+  selectedCourse: Course | null;
   isLoading: boolean;
   error: string | null;
   fetchTutors: () => Promise<void>;
   fetchTutorAvailability: (tutorId: string) => Promise<void>;
   fetchAppointments: () => Promise<void>;
+  fetchCourses: () => Promise<void>;
   selectTutor: (tutor: Tutor) => void;
   selectDay: (day: Date) => void;
   selectTimeSlot: (timeSlot: { start: string; end: string }) => void;
+  selectCourse: (course: Course | null) => void;
   bookAppointment: (notes?: string) => Promise<void>;
   cancelAppointment: (appointmentId: string) => Promise<void>;
 }
@@ -70,9 +82,11 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ start: string; end: string } | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -164,6 +178,32 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
     setSelectedDay(day);
   };
 
+  const fetchCourses = async () => {
+    if (!token) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await api.get('/courses/active', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      setCourses(response.data);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      setError('Failed to fetch courses');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectCourse = (course: Course | null) => {
+    setSelectedCourse(course);
+  };
+
   const selectTimeSlot = (timeSlot: { start: string; end: string }) => {
     setSelectedTimeSlot(timeSlot);
   };
@@ -193,6 +233,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
         tutorId: selectedTutor.id,
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
+        courseId: selectedCourse?.id,
         notes,
       }, {
         headers: {
@@ -204,6 +245,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       setSelectedTutor(null);
       setSelectedDay(null);
       setSelectedTimeSlot(null);
+      setSelectedCourse(null);
       
       await fetchAppointments();
       
@@ -271,17 +313,21 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
         tutors,
         availabilities,
         appointments,
+        courses,
         selectedTutor,
         selectedDay,
         selectedTimeSlot,
+        selectedCourse,
         isLoading,
         error,
         fetchTutors,
         fetchTutorAvailability,
         fetchAppointments,
+        fetchCourses,
         selectTutor,
         selectDay,
         selectTimeSlot,
+        selectCourse,
         bookAppointment,
         cancelAppointment,
       }}

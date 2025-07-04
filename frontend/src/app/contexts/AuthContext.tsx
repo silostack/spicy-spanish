@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
-import  api  from '../utils/api';
+import api from '../utils/api';
 
 export interface User {
   id: string;
@@ -11,6 +11,18 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'admin' | 'tutor' | 'student';
+  profilePicture?: string;
+  bio?: string;
+  timezone?: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  profession?: string;
+  address?: string;
+  isActive?: boolean;
+  tutorExperience?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface AuthContextType {
@@ -21,6 +33,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (userData: any) => Promise<void>;
   logout: () => void;
+  updateUser: (userData: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,19 +47,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check for token in localStorage on initial load
     const storedToken = localStorage.getItem('token');
+    console.log('Looking for stored token on initial load');
     
     if (storedToken) {
       try {
         // Validate token and set user
         const decoded: any = jwtDecode(storedToken);
+        console.log('Token decoded:', decoded);
         const currentTime = Date.now() / 1000;
         
         if (decoded.exp && decoded.exp > currentTime) {
+          console.log('Token is valid, expires at:', new Date(decoded.exp * 1000).toLocaleString());
           setToken(storedToken);
           // Fetch user data to get full profile
           fetchUserData(storedToken);
         } else {
           // Token expired
+          console.log('Token expired, removing from storage');
           localStorage.removeItem('token');
           setIsLoading(false);
         }
@@ -56,18 +73,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       }
     } else {
+      console.log('No token found in localStorage');
       setIsLoading(false);
     }
   }, []);
 
   const fetchUserData = async (authToken: string) => {
     try {
-      const response = await api.get('/auth/profile', {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
+      console.log('Fetching user profile with token');
+      // Let the interceptor add the token instead of adding it here
+      const response = await api.get('/auth/profile');
       
+      console.log('User profile fetched successfully:', response.data);
       setUser(response.data);
       setIsLoading(false);
     } catch (error) {
@@ -82,27 +99,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log('Attempting login with:', { email });
       const response = await api.post('/auth/login', { email, password });
       const { access_token } = response.data;
 
-      console.log('newToken', response.data);
-
+      console.log('Login successful, received token');
       
+      // Store token in localStorage and state
       localStorage.setItem('token', access_token);
       setToken(access_token);
+      
+      // Decode token to get basic user data
+      const decoded: any = jwtDecode(access_token);
+      console.log('Token decoded, role:', decoded.role);
       
       // Fetch user data with the new token
       await fetchUserData(access_token);
       
-      // Redirect based on user role
-      const decoded: any = jwtDecode(access_token);
-      if (decoded.role === 'admin') {
-        router.push('/dashboard');
-      } else if (decoded.role === 'tutor') {
-        router.push('/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
+      // All users go to dashboard regardless of role for now
+      router.push('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -119,9 +134,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? '/auth/register/tutor' 
         : '/auth/register/student';
       
+      console.log(`Registering user with endpoint: ${endpoint}`);
       const response = await api.post(endpoint, userData);
-      const { token: newToken } = response.data;
       
+      // Check if the response has access_token (for consistency with login)
+      // or token (old implementation)
+      const newToken = response.data.access_token || response.data.token;
+      
+      if (!newToken) {
+        console.error('No token received from registration!', response.data);
+        throw new Error('Registration successful but no token received');
+      }
+      
+      console.log('Registration successful, received token');
       localStorage.setItem('token', newToken);
       setToken(newToken);
       
@@ -145,6 +170,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/login');
   };
 
+  const updateUser = async (userData: Partial<User>) => {
+    if (!user || !token) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Transform date string to Date object if dateOfBirth is provided
+      const transformedData = { ...userData };
+      
+      // Remove empty strings and null values to avoid validation issues
+      Object.keys(transformedData).forEach(key => {
+        const value = transformedData[key as keyof typeof transformedData];
+        if (value === '' || value === null || value === undefined) {
+          delete transformedData[key as keyof typeof transformedData];
+        }
+      });
+      
+      // Handle dateOfBirth: convert to proper ISO string format for backend
+      if (transformedData.dateOfBirth && typeof transformedData.dateOfBirth === 'string') {
+        // Only keep if it's a valid date string
+        if (transformedData.dateOfBirth.trim() !== '') {
+          // Ensure it's in ISO format for the backend
+          const date = new Date(transformedData.dateOfBirth);
+          if (!isNaN(date.getTime())) {
+            transformedData.dateOfBirth = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+          } else {
+            delete transformedData.dateOfBirth;
+          }
+        } else {
+          delete transformedData.dateOfBirth;
+        }
+      }
+      
+      console.log('Sending user update data:', transformedData);
+      console.log('Data keys:', Object.keys(transformedData));
+      
+      const response = await api.patch(`/users/${user.id}`, transformedData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      // Update local user state with the response data
+      setUser(response.data);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -155,6 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}

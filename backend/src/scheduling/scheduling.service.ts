@@ -3,7 +3,10 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Appointment, AppointmentStatus } from './entities/appointment.entity';
 import { Availability } from './entities/availability.entity';
+import { Attendance, AttendanceStatus } from './entities/attendance.entity';
+import { ClassReport } from './entities/class-report.entity';
 import { User, UserRole } from '../users/entities/user.entity';
+import { Course } from '../courses/entities/course.entity';
 import { EmailService } from '../email/email.service';
 
 // can't install these
@@ -15,6 +18,7 @@ interface CreateAppointmentDto {
   tutorId: string;
   startTime: Date;
   endTime: Date;
+  courseId?: string;
   notes?: string;
 }
 
@@ -22,6 +26,7 @@ interface UpdateAppointmentDto {
   startTime?: Date;
   endTime?: Date;
   status?: AppointmentStatus;
+  courseId?: string;
   notes?: string;
 }
 
@@ -42,6 +47,37 @@ interface UpdateAvailabilityDto {
   specificDate?: Date;
 }
 
+interface CreateAttendanceDto {
+  appointmentId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  notes?: string;
+  markedByTutor?: boolean;
+}
+
+interface UpdateAttendanceDto {
+  status?: AttendanceStatus;
+  notes?: string;
+}
+
+interface CreateClassReportDto {
+  appointmentId: string;
+  tutorId: string;
+  subject: string;
+  content: string;
+  homeworkAssigned?: string;
+  studentProgress?: string;
+  nextLessonNotes?: string;
+}
+
+interface UpdateClassReportDto {
+  subject?: string;
+  content?: string;
+  homeworkAssigned?: string;
+  studentProgress?: string;
+  nextLessonNotes?: string;
+}
+
 @Injectable()
 export class SchedulingService {
   // private calendar: calendar_v3.Calendar;
@@ -52,8 +88,14 @@ export class SchedulingService {
     private readonly appointmentRepository: EntityRepository<Appointment>,
     @InjectRepository(Availability)
     private readonly availabilityRepository: EntityRepository<Availability>,
+    @InjectRepository(Attendance)
+    private readonly attendanceRepository: EntityRepository<Attendance>,
+    @InjectRepository(ClassReport)
+    private readonly classReportRepository: EntityRepository<ClassReport>,
     @InjectRepository(User)
     private readonly userRepository: EntityRepository<User>,
+    @InjectRepository(Course)
+    private readonly courseRepository: EntityRepository<Course>,
     private readonly em: EntityManager,
     private readonly emailService: EmailService,
   ) {
@@ -76,14 +118,14 @@ export class SchedulingService {
   // Appointment methods
   async findAllAppointments() {
     return this.appointmentRepository.findAll({
-      populate: ['student', 'tutor'],
+      populate: ['student', 'tutor', 'course'],
       orderBy: { startTime: 'ASC' },
     });
   }
 
   async findAppointmentById(id: string) {
     const appointment = await this.appointmentRepository.findOne({ id }, {
-      populate: ['student', 'tutor'],
+      populate: ['student', 'tutor', 'course'],
     });
     
     if (!appointment) {
@@ -184,11 +226,22 @@ export class SchedulingService {
       throw new BadRequestException('The selected time conflicts with another appointment');
     }
     
+    // Validate course if provided
+    let course = undefined;
+    if (createAppointmentDto.courseId) {
+      course = await this.courseRepository.findOne({ id: createAppointmentDto.courseId });
+      if (!course) {
+        throw new NotFoundException(`Course with ID ${createAppointmentDto.courseId} not found`);
+      }
+    }
+    
     const appointment = new Appointment(
       student,
       tutor,
       createAppointmentDto.startTime,
-      createAppointmentDto.endTime
+      createAppointmentDto.endTime,
+      AppointmentStatus.SCHEDULED,
+      course
     );
     
     if (createAppointmentDto.notes) {
@@ -612,6 +665,168 @@ export class SchedulingService {
       totalScheduledHours,
       totalCompletedAppointments: completedAppointments.length,
       totalScheduledAppointments: scheduledAppointments.length,
+    };
+  }
+
+  // Attendance methods
+  async createAttendance(createAttendanceDto: CreateAttendanceDto) {
+    const appointment = await this.appointmentRepository.findOne({ id: createAttendanceDto.appointmentId });
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${createAttendanceDto.appointmentId} not found`);
+    }
+
+    const student = await this.userRepository.findOne({ 
+      id: createAttendanceDto.studentId,
+      role: UserRole.STUDENT 
+    });
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${createAttendanceDto.studentId} not found`);
+    }
+
+    // Check if attendance already exists for this appointment
+    const existingAttendance = await this.attendanceRepository.findOne({ appointment });
+    if (existingAttendance) {
+      throw new BadRequestException('Attendance already recorded for this appointment');
+    }
+
+    const attendance = new Attendance(
+      appointment,
+      student,
+      createAttendanceDto.status,
+      createAttendanceDto.notes,
+      createAttendanceDto.markedByTutor
+    );
+
+    await this.em.persistAndFlush(attendance);
+    return attendance;
+  }
+
+  async findAttendanceByAppointment(appointmentId: string) {
+    return this.attendanceRepository.findOne(
+      { appointment: appointmentId },
+      { populate: ['appointment', 'student'] }
+    );
+  }
+
+  async findAttendanceByStudent(studentId: string) {
+    return this.attendanceRepository.find(
+      { student: studentId },
+      { 
+        populate: ['appointment', 'student'],
+        orderBy: { createdAt: 'DESC' }
+      }
+    );
+  }
+
+  async updateAttendance(id: string, updateAttendanceDto: UpdateAttendanceDto) {
+    const attendance = await this.attendanceRepository.findOne({ id });
+    if (!attendance) {
+      throw new NotFoundException(`Attendance with ID ${id} not found`);
+    }
+
+    this.em.assign(attendance, updateAttendanceDto);
+    await this.em.flush();
+    return attendance;
+  }
+
+  // Class Report methods
+  async createClassReport(createClassReportDto: CreateClassReportDto) {
+    const appointment = await this.appointmentRepository.findOne({ id: createClassReportDto.appointmentId });
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${createClassReportDto.appointmentId} not found`);
+    }
+
+    const tutor = await this.userRepository.findOne({ 
+      id: createClassReportDto.tutorId,
+      role: UserRole.TUTOR 
+    });
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${createClassReportDto.tutorId} not found`);
+    }
+
+    // Check if class report already exists for this appointment
+    const existingReport = await this.classReportRepository.findOne({ appointment });
+    if (existingReport) {
+      throw new BadRequestException('Class report already exists for this appointment');
+    }
+
+    const classReport = new ClassReport(
+      appointment,
+      tutor,
+      createClassReportDto.subject,
+      createClassReportDto.content,
+      createClassReportDto.homeworkAssigned,
+      createClassReportDto.studentProgress,
+      createClassReportDto.nextLessonNotes
+    );
+
+    await this.em.persistAndFlush(classReport);
+    return classReport;
+  }
+
+  async findClassReportByAppointment(appointmentId: string) {
+    return this.classReportRepository.findOne(
+      { appointment: appointmentId },
+      { populate: ['appointment', 'tutor'] }
+    );
+  }
+
+  async findClassReportsByTutor(tutorId: string) {
+    return this.classReportRepository.find(
+      { tutor: tutorId },
+      { 
+        populate: ['appointment', 'tutor'],
+        orderBy: { createdAt: 'DESC' }
+      }
+    );
+  }
+
+  async updateClassReport(id: string, updateClassReportDto: UpdateClassReportDto) {
+    const classReport = await this.classReportRepository.findOne({ id });
+    if (!classReport) {
+      throw new NotFoundException(`Class report with ID ${id} not found`);
+    }
+
+    this.em.assign(classReport, updateClassReportDto);
+    await this.em.flush();
+    return classReport;
+  }
+
+  async removeClassReport(id: string) {
+    const classReport = await this.classReportRepository.findOne({ id });
+    if (!classReport) {
+      throw new NotFoundException(`Class report with ID ${id} not found`);
+    }
+
+    await this.em.removeAndFlush(classReport);
+    return { id, deleted: true };
+  }
+
+  async getAttendanceStats(studentId?: string, tutorId?: string) {
+    const criteria: any = {};
+    if (studentId) criteria.student = studentId;
+    if (tutorId) criteria.appointment = { tutor: tutorId };
+
+    const [
+      totalAttendance,
+      presentCount,
+      absentCount,
+      onTimeCancellationCount
+    ] = await Promise.all([
+      this.attendanceRepository.count(criteria),
+      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.PRESENT }),
+      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.ABSENT }),
+      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.ON_TIME_CANCELLATION })
+    ]);
+
+    const attendanceRate = totalAttendance > 0 ? (presentCount / totalAttendance) * 100 : 0;
+
+    return {
+      totalAttendance,
+      presentCount,
+      absentCount,
+      onTimeCancellationCount,
+      attendanceRate: Math.round(attendanceRate * 100) / 100
     };
   }
 }

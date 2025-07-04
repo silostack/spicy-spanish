@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength } from 'class-validator';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -6,13 +7,58 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from './entities/user.entity';
 
 class UpdateUserDto {
+  @IsOptional()
+  @IsString()
   firstName?: string;
+
+  @IsOptional()
+  @IsString()
   lastName?: string;
+
+  @IsOptional()
+  @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
   password?: string;
+
+  @IsOptional()
+  @IsString()
   phoneNumber?: string;
+
+  @IsOptional()
+  @IsString()
   timezone?: string;
+
+  @IsOptional()
+  @IsString()
   bio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  nationality?: string;
+
+  @IsOptional()
+  @IsString()
+  profession?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  tutorExperience?: string;
 }
 
 @Controller('users')
@@ -33,7 +79,7 @@ export class UsersController {
   }
 
   @Get('tutors')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.STUDENT)
   getTutors() {
     return this.usersService.getTutors();
   }
@@ -51,9 +97,22 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.TUTOR, UserRole.STUDENT)
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+    console.log('Update user request received:');
+    console.log('User ID:', id);
+    console.log('Request body:', updateUserDto);
+    console.log('Request body keys:', Object.keys(updateUserDto));
+    
+    // Transform the DTO to match User entity types
+    const updateData: any = { ...updateUserDto };
+    
+    // Convert dateOfBirth string to Date if provided
+    if (updateData.dateOfBirth && typeof updateData.dateOfBirth === 'string') {
+      updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+    }
+    
+    return this.usersService.update(id, updateData);
   }
 
   @Delete(':id')

@@ -15,6 +15,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { AppointmentStatus } from './entities/appointment.entity';
+import { AttendanceStatus } from './entities/attendance.entity';
 
 // DTO interfaces for type safety
 interface CreateAppointmentDto {
@@ -22,6 +23,7 @@ interface CreateAppointmentDto {
   tutorId: string;
   startTime: Date;
   endTime: Date;
+  courseId?: string;
   notes?: string;
 }
 
@@ -29,6 +31,7 @@ interface UpdateAppointmentDto {
   startTime?: Date;
   endTime?: Date;
   status?: AppointmentStatus;
+  courseId?: string;
   notes?: string;
 }
 
@@ -47,6 +50,37 @@ interface UpdateAvailabilityDto {
   endTime?: string;
   isRecurring?: boolean;
   specificDate?: Date;
+}
+
+interface CreateAttendanceDto {
+  appointmentId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  notes?: string;
+  markedByTutor?: boolean;
+}
+
+interface UpdateAttendanceDto {
+  status?: AttendanceStatus;
+  notes?: string;
+}
+
+interface CreateClassReportDto {
+  appointmentId: string;
+  tutorId: string;
+  subject: string;
+  content: string;
+  homeworkAssigned?: string;
+  studentProgress?: string;
+  nextLessonNotes?: string;
+}
+
+interface UpdateClassReportDto {
+  subject?: string;
+  content?: string;
+  homeworkAssigned?: string;
+  studentProgress?: string;
+  nextLessonNotes?: string;
 }
 
 @Controller('scheduling')
@@ -140,6 +174,66 @@ export class SchedulingController {
   @Roles(UserRole.TUTOR, UserRole.ADMIN)
   async removeAvailability(@Param('id') id: string) {
     return this.schedulingService.removeAvailability(id);
+  }
+
+  // Attendance endpoints
+  @Post('attendance')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  async createAttendance(@Body() createAttendanceDto: CreateAttendanceDto) {
+    return this.schedulingService.createAttendance(createAttendanceDto);
+  }
+
+  @Get('attendance/appointment/:appointmentId')
+  async getAttendanceByAppointment(@Param('appointmentId') appointmentId: string) {
+    return this.schedulingService.findAttendanceByAppointment(appointmentId);
+  }
+
+  @Get('attendance/student/:studentId')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  async getAttendanceByStudent(@Param('studentId') studentId: string) {
+    return this.schedulingService.findAttendanceByStudent(studentId);
+  }
+
+  @Patch('attendance/:id')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  async updateAttendance(@Param('id') id: string, @Body() updateAttendanceDto: UpdateAttendanceDto) {
+    return this.schedulingService.updateAttendance(id, updateAttendanceDto);
+  }
+
+  @Get('attendance/stats')
+  @Roles(UserRole.ADMIN)
+  async getAttendanceStats(@Query('studentId') studentId?: string, @Query('tutorId') tutorId?: string) {
+    return this.schedulingService.getAttendanceStats(studentId, tutorId);
+  }
+
+  // Class Report endpoints
+  @Post('class-reports')
+  @Roles(UserRole.TUTOR)
+  async createClassReport(@Body() createClassReportDto: CreateClassReportDto) {
+    return this.schedulingService.createClassReport(createClassReportDto);
+  }
+
+  @Get('class-reports/appointment/:appointmentId')
+  async getClassReportByAppointment(@Param('appointmentId') appointmentId: string) {
+    return this.schedulingService.findClassReportByAppointment(appointmentId);
+  }
+
+  @Get('class-reports/tutor/:tutorId')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  async getClassReportsByTutor(@Param('tutorId') tutorId: string) {
+    return this.schedulingService.findClassReportsByTutor(tutorId);
+  }
+
+  @Patch('class-reports/:id')
+  @Roles(UserRole.TUTOR)
+  async updateClassReport(@Param('id') id: string, @Body() updateClassReportDto: UpdateClassReportDto) {
+    return this.schedulingService.updateClassReport(id, updateClassReportDto);
+  }
+
+  @Delete('class-reports/:id')
+  @Roles(UserRole.TUTOR, UserRole.ADMIN)
+  async removeClassReport(@Param('id') id: string) {
+    return this.schedulingService.removeClassReport(id);
   }
 
   // Stats endpoint

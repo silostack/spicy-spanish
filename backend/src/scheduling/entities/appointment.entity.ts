@@ -1,6 +1,7 @@
 import { Entity, ManyToOne, PrimaryKey, Property, Enum } from '@mikro-orm/core';
 import { v4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
+import { Course } from '../../courses/entities/course.entity';
 
 export enum AppointmentStatus {
   SCHEDULED = 'scheduled',
@@ -19,6 +20,9 @@ export class Appointment {
 
   @ManyToOne(() => User)
   tutor!: User;
+
+  @ManyToOne(() => Course, { nullable: true })
+  course?: Course;
 
   @Property()
   startTime: Date;
@@ -62,11 +66,13 @@ export class Appointment {
     startTime: Date,
     endTime: Date,
     status: AppointmentStatus = AppointmentStatus.SCHEDULED,
+    course?: Course,
   ) {
     this.student = student;
     this.tutor = tutor;
     this.startTime = startTime;
     this.endTime = endTime;
     this.status = status;
+    this.course = course;
   }
 }

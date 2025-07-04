@@ -1,18 +1,20 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api } from '../utils/api';
+import api from '../utils/api';
 import { useAuth } from './AuthContext';
+
+export type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
 
 interface Course {
   id: string;
-  name: string;
+  title: string;
   description: string;
-  level: string;
+  learningLevel: LearningLevel;
   imageUrl?: string;
-  price: number;
-  durationWeeks: number;
-  lessonCount: number;
+  price?: number;
+  durationWeeks?: number;
+  lessonCount?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -68,11 +70,17 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
   const { token, user } = useAuth();
 
   const fetchCourses = async () => {
+    if (!token) return;
+    
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await api.get('/courses');
+      const response = await api.get('/courses', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setCourses(response.data);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -105,11 +113,17 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const fetchCourseById = async (id: string) => {
+    if (!token) return;
+    
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await api.get(`/courses/${id}`);
+      const response = await api.get(`/courses/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       setCurrentCourse(response.data);
     } catch (error) {
       console.error('Error fetching course details:', error);

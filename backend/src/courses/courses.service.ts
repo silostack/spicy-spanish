@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { Course } from './entities/course.entity';
+import { Course, LearningLevel } from './entities/course.entity';
 import { CourseLesson } from './entities/course-lesson.entity';
 import { StudentCourse } from './entities/student-course.entity';
 import { User, UserRole } from '../users/entities/user.entity';
@@ -9,12 +9,14 @@ import { User, UserRole } from '../users/entities/user.entity';
 interface CreateCourseDto {
   title: string;
   description: string;
+  learningLevel: LearningLevel;
   isActive?: boolean;
 }
 
 interface UpdateCourseDto {
   title?: string;
   description?: string;
+  learningLevel?: LearningLevel;
   isActive?: boolean;
 }
 
@@ -64,6 +66,12 @@ export class CoursesService {
     });
   }
 
+  async findCoursesByLevel(learningLevel: LearningLevel) {
+    return this.courseRepository.find({ learningLevel, isActive: true }, {
+      orderBy: { title: 'ASC' },
+    });
+  }
+
   async findCourseById(id: string) {
     const course = await this.courseRepository.findOne({ id }, {
       populate: ['lessons'],
@@ -80,6 +88,7 @@ export class CoursesService {
     const course = new Course(
       createCourseDto.title,
       createCourseDto.description,
+      createCourseDto.learningLevel,
       createCourseDto.isActive !== undefined ? createCourseDto.isActive : true,
     );
     

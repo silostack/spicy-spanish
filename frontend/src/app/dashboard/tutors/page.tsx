@@ -15,6 +15,14 @@ interface Tutor {
   totalStudents?: number;
   totalHours?: number;
   invitationStatus?: 'pending' | 'accepted' | 'expired';
+  isActive?: boolean;
+  phoneNumber?: string;
+  timezone?: string;
+  tutorExperience?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  profession?: string;
+  address?: string;
 }
 
 export default function TutorsPage() {
@@ -73,6 +81,17 @@ export default function TutorsPage() {
     } catch (error) {
       console.error('Error resending invitation:', error);
       alert('Failed to resend invitation');
+    }
+  };
+
+  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      await api.patch(`/users/${userId}`, { isActive: !currentStatus });
+      // Refresh the tutors list
+      fetchTutors();
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Failed to update user status');
     }
   };
 
@@ -247,23 +266,37 @@ export default function TutorsPage() {
                       {formatDate(tutor.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {tutor.invitationStatus === 'pending' ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Invitation Pending
-                        </span>
-                      ) : tutor.invitationStatus === 'expired' ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                          Invitation Expired
-                        </span>
-                      ) : tutor.lastActive && new Date(tutor.lastActive) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                          Inactive
-                        </span>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {tutor.invitationStatus === 'pending' ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            Invitation Pending
+                          </span>
+                        ) : tutor.invitationStatus === 'expired' ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            Invitation Expired
+                          </span>
+                        ) : (
+                          <>
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              tutor.isActive !== false
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {tutor.isActive !== false ? 'Active' : 'Inactive'}
+                            </span>
+                            <button
+                              onClick={() => toggleUserStatus(tutor.id, tutor.isActive !== false)}
+                              className={`text-xs px-2 py-1 rounded ${
+                                tutor.isActive !== false
+                                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                  : 'bg-green-100 text-green-600 hover:bg-green-200'
+                              }`}
+                            >
+                              {tutor.isActive !== false ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {tutor.totalStudents || 0} students
