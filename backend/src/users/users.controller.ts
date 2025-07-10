@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength } from 'class-validator';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength, IsNumber, IsIn } from 'class-validator';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -61,6 +61,24 @@ class UpdateUserDto {
   tutorExperience?: string;
 }
 
+class StudentListQueryDto {
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsIn(['all', 'active', 'inactive', 'new'])
+  filter?: 'all' | 'active' | 'inactive' | 'new';
+}
+
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
@@ -74,14 +92,41 @@ export class UsersController {
 
   @Get('students')
   @Roles(UserRole.ADMIN)
-  getStudents() {
-    return this.usersService.getStudents();
+  getStudents(@Query() query: StudentListQueryDto) {
+    console.log('🎯 UsersController.getStudents called with query:', query);
+    // Convert string query params to numbers
+    const parsedQuery = {
+      ...query,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    };
+    console.log('🎯 Parsed query:', parsedQuery);
+    console.log('🎯 Calling getStudentsWithPagination...');
+    return this.usersService.getStudentsWithPagination(parsedQuery);
   }
 
   @Get('tutors')
   @Roles(UserRole.ADMIN, UserRole.STUDENT)
   getTutors() {
     return this.usersService.getTutors();
+  }
+
+  @Get('tutors/:tutorId/students')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  getStudentsByTutor(@Param('tutorId') tutorId: string, @Query() query: StudentListQueryDto) {
+    // Convert string query params to numbers
+    const parsedQuery = {
+      ...query,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    };
+    return this.usersService.getStudentsByTutorId(tutorId, parsedQuery);
+  }
+
+  @Get('students/:id')
+  @Roles(UserRole.ADMIN, UserRole.TUTOR)
+  getStudentById(@Param('id') id: string) {
+    return this.usersService.getStudentById(id);
   }
 
   @Get('count')

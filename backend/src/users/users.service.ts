@@ -2,7 +2,29 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { User, UserRole } from './entities/user.entity';
+import { StudentCourse } from '../courses/entities/student-course.entity';
+import { Transaction, TransactionStatus } from '../payments/entities/transaction.entity';
+import { Appointment } from '../scheduling/entities/appointment.entity';
 import * as bcrypt from 'bcrypt';
+
+interface StudentListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  filter?: 'all' | 'active' | 'inactive' | 'new';
+  tutorId?: string;
+}
+
+interface StudentWithDetails extends User {
+  coursesEnrolled: number;
+  availableHours: number;
+  lastActive?: Date;
+  assignedTutor?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
+}
 
 @Injectable()
 export class UsersService {
@@ -101,5 +123,184 @@ export class UsersService {
       newUsersThisMonth,
       total: totalStudents + totalTutors,
     };
+  }
+
+  async getStudentsWithPagination(query: StudentListQuery = {}) {
+    console.log('🔧 UsersService.getStudentsWithPagination called with:', query);
+    const { 
+      page = 1, 
+      limit = 10, 
+      search = '', 
+      filter = 'all',
+      tutorId 
+    } = query;
+
+    const offset = (page - 1) * limit;
+    console.log('🔧 Pagination params:', { page, limit, offset, search, filter, tutorId });
+    
+    // Build base criteria
+    const criteria: any = { role: UserRole.STUDENT };
+    
+    // Apply filters
+    if (filter === 'active') {
+      criteria.isActive = true;
+    } else if (filter === 'inactive') {
+      criteria.isActive = false;
+    } else if (filter === 'new') {
+      const firstDayOfMonth = new Date();
+      firstDayOfMonth.setDate(1);
+      firstDayOfMonth.setHours(0, 0, 0, 0);
+      criteria.createdAt = { $gte: firstDayOfMonth };
+    }
+    
+    // Apply search
+    if (search) {
+      criteria.$or = [
+        { firstName: { $ilike: `%${search}%` } },
+        { lastName: { $ilike: `%${search}%` } },
+        { email: { $ilike: `%${search}%` } },
+      ];
+    }
+    
+    // If tutorId is provided, filter by students assigned to that tutor
+    let students;
+    let total;
+    
+    if (tutorId) {
+      // Get students assigned to this tutor through StudentCourse
+      const studentCourses = await this.em.find(StudentCourse, 
+        { tutor: tutorId },
+        { populate: ['student'] }
+      );
+      
+      const studentIds = studentCourses.map(sc => sc.student.id);
+      
+      if (studentIds.length > 0) {
+        criteria.id = { $in: studentIds };
+        [students, total] = await this.userRepository.findAndCount(criteria, {
+          orderBy: { createdAt: 'DESC' },
+          limit,
+          offset,
+        });
+      } else {
+        students = [];
+        total = 0;
+      }
+    } else {
+      [students, total] = await this.userRepository.findAndCount(criteria, {
+        orderBy: { createdAt: 'DESC' },
+        limit,
+        offset,
+      });
+    }
+    
+    // Enrich students with additional details
+    const enrichedStudents = await Promise.all(
+      students.map(async (student) => {
+        const [coursesCount, transactions, lastAppointment] = await Promise.all([
+          this.em.count(StudentCourse, { student: student.id }),
+          this.em.find(Transaction, {
+            student: student.id,
+            status: TransactionStatus.COMPLETED,
+          }),
+          this.em.findOne(Appointment, 
+            { student: student.id },
+            { orderBy: { startTime: 'DESC' } }
+          )
+        ]);
+        
+        // Calculate available hours from transactions
+        const availableHours = transactions.reduce((total, t) => total + t.hours, 0);
+        
+        const enriched: StudentWithDetails = {
+          ...student,
+          coursesEnrolled: coursesCount,
+          availableHours,
+          lastActive: lastAppointment?.startTime,
+        };
+        
+        return enriched;
+      })
+    );
+    
+    const result = {
+      items: enrichedStudents,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+    
+    console.log('🔧 getStudentsWithPagination returning:', {
+      itemsCount: enrichedStudents.length,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      resultType: typeof result,
+      resultKeys: Object.keys(result)
+    });
+    
+    return result;
+  }
+
+  async getStudentById(id: string) {
+    const student = await this.userRepository.findOne({ 
+      id, 
+      role: UserRole.STUDENT 
+    });
+    
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${id} not found`);
+    }
+    
+    // Get detailed information
+    const [courseAssignments, transactions, appointments] = await Promise.all([
+      this.em.find(StudentCourse, 
+        { student: id },
+        { populate: ['course', 'tutor'] }
+      ),
+      this.em.find(Transaction, {
+        student: id,
+        status: TransactionStatus.COMPLETED,
+      }),
+      this.em.find(Appointment, 
+        { student: id },
+        { 
+          populate: ['tutor', 'course'],
+          orderBy: { startTime: 'DESC' },
+          limit: 5 
+        }
+      )
+    ]);
+    
+    // Calculate hours
+    const totalHoursPurchased = transactions.reduce((total, t) => total + t.hours, 0);
+    const hoursUsed = appointments.filter(a => a.status === 'completed').length; // Assuming 1 hour per appointment
+    const availableHours = totalHoursPurchased - hoursUsed;
+    
+    return {
+      ...student,
+      courseAssignments,
+      transactions,
+      recentAppointments: appointments,
+      totalHoursPurchased,
+      hoursUsed,
+      availableHours,
+    };
+  }
+
+  async getStudentsByTutorId(tutorId: string, query: StudentListQuery = {}) {
+    // Verify tutor exists
+    const tutor = await this.userRepository.findOne({ 
+      id: tutorId, 
+      role: UserRole.TUTOR 
+    });
+    
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${tutorId} not found`);
+    }
+    
+    return this.getStudentsWithPagination({ ...query, tutorId });
   }
 }

@@ -1,124 +1,182 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
+// Types
 interface Student {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
-  createdAt: string;
-  lastActive?: string;
-  availableHours?: number;
-  coursesEnrolled?: number;
-  isActive?: boolean;
   phoneNumber?: string;
-  timezone?: string;
-  dateOfBirth?: string;
-  nationality?: string;
-  profession?: string;
-  address?: string;
+  createdAt: string;
+  isActive: boolean;
+  coursesEnrolled: number;
+  availableHours: number;
+  lastActive?: string;
 }
 
+interface ApiResponse {
+  items: Student[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// Main Component
 export default function StudentsPage() {
+  console.log('🚀 StudentsPage component rendering');
+  
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  console.log('🔐 Auth state:', { user, authLoading, isAuthenticated });
+  
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive' | 'new'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filter, setFilter] = useState('all');
-  const [user, setUser] = useState({ role: '' });
+  const [total, setTotal] = useState(0);
+  
+  const ITEMS_PER_PAGE = 10;
 
+  // Load students when user is available
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (e) {
-          console.error('Error parsing user data', e);
-        }
-      }
-    }
+    console.log('👀 useEffect triggered - user changed:', { user });
     
-    fetchStudents();
-  }, [currentPage, filter]);
+    if (user) {
+      console.log('✅ User available, fetching students');
+      fetchStudents();
+    } else {
+      console.log('❌ No user available yet');
+    }
+  }, [user, currentPage, filter]);
+
+  // Debug auth loading changes
+  useEffect(() => {
+    console.log('🔄 Auth loading state changed:', authLoading);
+  }, [authLoading]);
+
+  // Debug authentication changes
+  useEffect(() => {
+    console.log('🔒 Authentication state changed:', isAuthenticated);
+  }, [isAuthenticated]);
 
   const fetchStudents = async () => {
+    console.log('🔍 fetchStudents called');
+    
+    if (!user) {
+      console.log('❌ No user available for fetchStudents');
+      return;
+    }
+    
     try {
+      console.log('⏳ Starting to fetch students...');
       setLoading(true);
+      setError(null);
       
-      // Different API call depending on user role
-      let response;
-      if (user.role === 'admin') {
-        response = await api.get('/users/students', {
-          params: {
-            page: currentPage,
-            limit: 10,
-            filter,
-            search: searchTerm || undefined,
-          },
-        });
-      } else if (user.role === 'tutor') {
-        response = await api.get(`/users/tutors/${user.id}/students`, {
-          params: {
-            page: currentPage,
-            limit: 10,
-            filter,
-            search: searchTerm || undefined,
-          },
-        });
-      } else {
-        setError('Unauthorized to view students');
-        setLoading(false);
-        return;
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: ITEMS_PER_PAGE.toString(),
+        filter,
+      });
+      
+      if (searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
       }
       
-      setStudents(response.data.items);
-      setTotalPages(Math.ceil(response.data.total / 10));
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      setError('Failed to load students');
-      setLoading(false);
+      let endpoint = '/users/students';
       
-      // Fallback to mock data for demonstration
-      setStudents([
-        {
-          id: '1',
-          firstName: 'John',
-          lastName: 'Smith',
-          email: 'john.smith@example.com',
-          createdAt: '2025-02-10T00:00:00Z',
-          lastActive: '2025-04-05T00:00:00Z',
-          availableHours: 8.5,
-          coursesEnrolled: 2
-        },
-        {
-          id: '2',
-          firstName: 'Emily',
-          lastName: 'Johnson',
-          email: 'emily.j@example.com',
-          createdAt: '2025-03-15T00:00:00Z',
-          lastActive: '2025-04-08T00:00:00Z',
-          availableHours: 12,
-          coursesEnrolled: 1
-        }
-      ]);
-      setTotalPages(1);
+      // If user is a tutor, get only their students
+      if (user.role === 'tutor') {
+        endpoint = `/users/tutors/${user.id}/students`;
+      }
+      
+      const fullUrl = `${endpoint}?${params.toString()}`;
+      console.log('🌐 Making API call to:', fullUrl);
+      console.log('👤 User role:', user.role);
+      console.log('🆔 User ID:', user.id);
+      
+      const response = await api.get<ApiResponse>(fullUrl);
+      console.log('✅ API response received:', response.data);
+      console.log('📊 Response data type:', typeof response.data);
+      console.log('📊 Response data keys:', Object.keys(response.data || {}));
+      console.log('📊 Is array:', Array.isArray(response.data));
+      
+      // Handle both direct array response and paginated response
+      if (Array.isArray(response.data)) {
+        // Backend returned students directly as array
+        console.log('📊 Handling direct array response');
+        setStudents(response.data);
+        setTotal(response.data.length);
+        setTotalPages(1);
+      } else if (response.data && response.data.items) {
+        // Backend returned paginated response
+        console.log('📊 Handling paginated response');
+        setStudents(response.data.items);
+        setTotal(response.data.total);
+        setTotalPages(response.data.totalPages);
+      } else {
+        console.error('📊 Unexpected response format:', response.data);
+        throw new Error('Unexpected response format from server');
+      }
+      
+      console.log('📊 Students state updated:', {
+        count: Array.isArray(response.data) ? response.data.length : response.data?.items?.length || 0,
+        total: Array.isArray(response.data) ? response.data.length : response.data?.total || 0,
+        totalPages: Array.isArray(response.data) ? 1 : response.data?.totalPages || 1
+      });
+      
+    } catch (error: any) {
+      console.error('💥 Error fetching students:', error);
+      console.error('💥 Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText
+      });
+      setError('Failed to load students. Please try again.');
+    } finally {
+      console.log('🏁 fetchStudents completed, setting loading to false');
       setLoading(false);
-      setError(null);
     }
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔍 Search triggered with term:', searchTerm);
     setCurrentPage(1);
     fetchStudents();
+  };
+
+  const handleFilterChange = (newFilter: 'all' | 'active' | 'inactive' | 'new') => {
+    console.log('🔄 Filter changed from', filter, 'to', newFilter);
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    console.log('📄 Page changed from', currentPage, 'to', page);
+    setCurrentPage(page);
+  };
+
+  const toggleStudentStatus = async (studentId: string, currentStatus: boolean) => {
+    console.log('🔄 Toggling student status:', { studentId, currentStatus });
+    try {
+      await api.patch(`/users/${studentId}`, { isActive: !currentStatus });
+      console.log('✅ Student status updated successfully');
+      await fetchStudents(); // Refresh the list
+    } catch (error) {
+      console.error('💥 Error updating student status:', error);
+      alert('Failed to update student status');
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -129,288 +187,392 @@ export default function StudentsPage() {
     });
   };
 
-  const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
-    try {
-      await api.patch(`/users/${userId}`, { isActive: !currentStatus });
-      // Refresh the students list
-      fetchStudents();
-    } catch (error) {
-      console.error('Error updating user status:', error);
-      alert('Failed to update user status');
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
   };
 
-  if (loading && students.length === 0) {
+  const getStatusText = (isActive: boolean) => {
+    return isActive ? 'Active' : 'Inactive';
+  };
+
+  // Debug all loading conditions
+  console.log('🔍 Checking loading conditions:', {
+    authLoading,
+    user: !!user,
+    loading,
+    isAuthenticated
+  });
+
+  // Show loading spinner while auth is loading or students are loading
+  if (authLoading) {
+    console.log('⏳ Showing auth loading spinner');
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-spicy-red"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spicy-red mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading authentication...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (!user && !authLoading) {
+    console.log('❌ No user and not loading - should redirect');
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 p-4 rounded-lg">
-          <h2 className="text-xl text-red-700 font-semibold">Error</h2>
-          <p className="text-red-600">{error}</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Not authenticated. Please log in.</p>
         </div>
       </div>
     );
   }
+
+  if (loading) {
+    console.log('⏳ Showing data loading spinner');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spicy-red mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading students...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error message
+  if (error) {
+    console.log('💥 Showing error message:', error);
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error</h2>
+          <p className="text-red-600">{error}</p>
+          <button
+            onClick={() => {
+              console.log('🔄 Retry button clicked');
+              fetchStudents();
+            }}
+            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user has permission to view students
+  if (user && user.role !== 'admin' && user.role !== 'tutor') {
+    console.log('🚫 User does not have permission to view students:', user.role);
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-lg font-semibold text-yellow-800 mb-2">Access Restricted</h2>
+          <p className="text-yellow-600">Only administrators and tutors can view students.</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('🎉 Rendering students page with data:', {
+    studentsCount: students.length,
+    userRole: user?.role,
+    total,
+    currentPage,
+    totalPages
+  });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-spicy-dark">
-            {user.role === 'admin' ? 'All Students' : 'My Students'}
-          </h1>
-          <p className="text-gray-600">
-            {user.role === 'admin' 
-              ? 'Manage all student accounts' 
-              : 'View students assigned to you'}
-          </p>
-        </div>
-        {user.role === 'admin' && (
-          <Link
-            href="/dashboard/students/new"
-            className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5 mr-2" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Student
-          </Link>
-        )}
-      </div>
-
-      {/* Filters and Search */}
-      <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap gap-2 mb-4 md:mb-0">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'all'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              All Students
-            </button>
-            <button
-              onClick={() => setFilter('active')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'active'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Active
-            </button>
-            {user.role === 'admin' && (
-              <>
-                <button
-                  onClick={() => setFilter('inactive')}
-                  className={`px-3 py-1 rounded-full text-sm ${
-                    filter === 'inactive'
-                      ? 'bg-spicy-red text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {user?.role === 'admin' ? 'All Students' : 'My Students'}
+              </h1>
+              <p className="mt-2 text-sm text-gray-600">
+                {user?.role === 'admin' 
+                  ? 'Manage all student accounts and their progress' 
+                  : 'View and manage your assigned students'}
+              </p>
+            </div>
+            {user?.role === 'admin' && (
+              <div className="mt-4 sm:mt-0">
+                <Link
+                  href="/dashboard/students/new"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-spicy-red hover:bg-spicy-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-spicy-red"
                 >
-                  Inactive
-                </button>
-                <button
-                  onClick={() => setFilter('new')}
-                  className={`px-3 py-1 rounded-full text-sm ${
-                    filter === 'new'
-                      ? 'bg-spicy-red text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  New (This Month)
-                </button>
-              </>
+                  <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Student
+                </Link>
+              </div>
             )}
           </div>
-          
-          <form onSubmit={handleSearch} className="flex">
-            <input
-              type="text"
-              placeholder="Search students..."
-              className="px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-spicy-red"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="bg-spicy-red text-white px-4 py-2 rounded-r-lg hover:bg-spicy-orange"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </button>
-          </form>
         </div>
-      </div>
 
-      {/* Students Table */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Joined
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hours
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {students.length > 0 ? (
-                students.map((student) => (
-                  <tr key={student.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-spicy-red flex items-center justify-center text-white font-bold">
-                          {student.firstName[0]}{student.lastName[0]}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {student.firstName} {student.lastName}
+        {/* Filters and Search */}
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleFilterChange('all')}
+                className={`px-4 py-2 text-sm font-medium rounded-md ${
+                  filter === 'all'
+                    ? 'bg-spicy-red text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Students ({total})
+              </button>
+              <button
+                onClick={() => handleFilterChange('active')}
+                className={`px-4 py-2 text-sm font-medium rounded-md ${
+                  filter === 'active'
+                    ? 'bg-spicy-red text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Active
+              </button>
+              {user?.role === 'admin' && (
+                <>
+                  <button
+                    onClick={() => handleFilterChange('inactive')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md ${
+                      filter === 'inactive'
+                        ? 'bg-spicy-red text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Inactive
+                  </button>
+                  <button
+                    onClick={() => handleFilterChange('new')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md ${
+                      filter === 'new'
+                        ? 'bg-spicy-red text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    New This Month
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Search Form */}
+            <div className="flex-1 max-w-lg">
+              <form onSubmit={handleSearch} className="flex">
+                <input
+                  type="text"
+                  placeholder="Search students..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1 block w-full rounded-l-md border-gray-300 focus:border-spicy-red focus:ring-spicy-red sm:text-sm"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-spicy-red hover:bg-spicy-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-spicy-red"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Students Table */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contact
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Courses
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hours
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Joined
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {students.length > 0 ? (
+                  students.map((student) => (
+                    <tr key={student.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-spicy-red flex items-center justify-center text-white font-medium">
+                            {student.firstName[0]}{student.lastName[0]}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {student.firstName} {student.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {student.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(student.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          student.isActive !== false
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {student.isActive !== false ? 'Active' : 'Inactive'}
-                        </span>
-                        {user.role === 'admin' && (
-                          <button
-                            onClick={() => toggleUserStatus(student.id, student.isActive !== false)}
-                            className={`text-xs px-2 py-1 rounded ${
-                              student.isActive !== false
-                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                                : 'bg-green-100 text-green-600 hover:bg-green-200'
-                            }`}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{student.email}</div>
+                        {student.phoneNumber && (
+                          <div className="text-sm text-gray-500">{student.phoneNumber}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(student.isActive)}`}>
+                            {getStatusText(student.isActive)}
+                          </span>
+                          {user?.role === 'admin' && (
+                            <button
+                              onClick={() => toggleStudentStatus(student.id, student.isActive)}
+                              className={`text-xs px-2 py-1 rounded ${
+                                student.isActive
+                                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                  : 'bg-green-100 text-green-600 hover:bg-green-200'
+                              }`}
+                            >
+                              {student.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {student.coursesEnrolled} courses
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {student.availableHours} hours
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(student.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <Link
+                            href={`/dashboard/students/${student.id}`}
+                            className="text-spicy-red hover:text-spicy-orange"
                           >
-                            {student.isActive !== false ? 'Deactivate' : 'Activate'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {student.availableHours || 0} hours
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Link href={`/dashboard/students/${student.id}`} className="text-spicy-red hover:text-spicy-orange">
-                          View
-                        </Link>
-                        {user.role === 'admin' && (
-                          <Link href={`/dashboard/students/${student.id}/edit`} className="text-blue-600 hover:text-blue-900">
-                            Edit
+                            View
                           </Link>
-                        )}
-                        {user.role === 'tutor' && (
-                          <Link href={`/dashboard/students/${student.id}/appointments`} className="text-blue-600 hover:text-blue-900">
-                            Schedule
-                          </Link>
-                        )}
+                          {user?.role === 'admin' && (
+                            <Link
+                              href={`/dashboard/students/${student.id}/edit`}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              Edit
+                            </Link>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                      <div className="text-lg font-medium text-gray-900">No students found</div>
+                      <div className="mt-1">
+                        {searchTerm ? 'Try adjusting your search terms' : 'No students have been added yet'}
                       </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                    No students found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center">
-          <nav className="inline-flex rounded-md shadow">
-            <button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Previous
-            </button>
-            <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Next
-            </button>
-          </nav>
-        </div>
-      )}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
+                  <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, total)}</span> of{' '}
+                  <span className="font-medium">{total}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                  <button
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  {[...Array(totalPages)].map((_, i) => {
+                    const page = i + 1;
+                    const isCurrentPage = page === currentPage;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          isCurrentPage
+                            ? 'z-10 bg-spicy-red border-spicy-red text-white'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
