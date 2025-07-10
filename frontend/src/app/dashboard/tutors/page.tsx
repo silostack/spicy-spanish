@@ -36,26 +36,58 @@ export default function TutorsPage() {
 
   useEffect(() => {
     fetchTutors();
-  }, [currentPage, filter]);
+  }, [currentPage, filter, searchTerm]);
 
   const fetchTutors = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/users/tutors', {
-        params: {
-          page: currentPage,
-          limit: 10,
-          filter,
-          search: searchTerm || undefined,
-        },
-      });
+      const response = await api.get('/users/tutors');
       
-      setTutors(response.data.items);
-      setTotalPages(Math.ceil(response.data.total / 10));
+      // Backend returns array directly, not paginated response
+      const tutorsData = response.data || [];
+      
+      // Apply client-side filtering if needed
+      let filteredTutors = tutorsData;
+      if (filter !== 'all') {
+        filteredTutors = tutorsData.filter(tutor => {
+          switch (filter) {
+            case 'active':
+              return tutor.isActive !== false;
+            case 'pending':
+              return tutor.invitationStatus === 'pending';
+            case 'new':
+              const oneMonthAgo = new Date();
+              oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+              return new Date(tutor.createdAt) > oneMonthAgo;
+            default:
+              return true;
+          }
+        });
+      }
+      
+      // Apply search filter if needed
+      if (searchTerm) {
+        filteredTutors = filteredTutors.filter(tutor =>
+          tutor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          tutor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          tutor.email.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      
+      // Apply pagination
+      const limit = 10;
+      const total = filteredTutors.length;
+      const startIndex = (currentPage - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedTutors = filteredTutors.slice(startIndex, endIndex);
+      
+      setTutors(paginatedTutors);
+      setTotalPages(Math.ceil(total / limit));
       setLoading(false);
     } catch (error) {
       console.error('Error fetching tutors:', error);
       setError('Failed to load tutors');
+      setTutors([]);
       setLoading(false);
     }
   };
@@ -63,7 +95,7 @@ export default function TutorsPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
-    fetchTutors();
+    // fetchTutors will be called by useEffect when searchTerm changes
   };
 
   const formatDate = (dateString: string) => {
