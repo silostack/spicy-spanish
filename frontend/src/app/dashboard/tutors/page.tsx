@@ -49,7 +49,7 @@ export default function TutorsPage() {
       // Apply client-side filtering if needed
       let filteredTutors = tutorsData;
       if (filter !== 'all') {
-        filteredTutors = tutorsData.filter(tutor => {
+        filteredTutors = tutorsData.filter((tutor: Tutor) => {
           switch (filter) {
             case 'active':
               return tutor.isActive !== false;
@@ -67,7 +67,7 @@ export default function TutorsPage() {
       
       // Apply search filter if needed
       if (searchTerm) {
-        filteredTutors = filteredTutors.filter(tutor =>
+        filteredTutors = filteredTutors.filter((tutor: Tutor) =>
           tutor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           tutor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           tutor.email.toLowerCase().includes(searchTerm.toLowerCase())

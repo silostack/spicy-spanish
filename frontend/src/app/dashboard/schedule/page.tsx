@@ -36,7 +36,7 @@ export default function SchedulePage() {
   const [bookingNotes, setBookingNotes] = useState<string>('');
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [date, setDate] = useState('');
-  const [availableSlots, setAvailableSlots] = useState<{startTime: string, endTime: string}[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<{start: string, end: string}[]>([]);
   
   // View appointment details modal
   const [showAppointmentDetails, setShowAppointmentDetails] = useState(false);
@@ -61,8 +61,9 @@ export default function SchedulePage() {
   }, [selectedTutor, date, availabilities]);
 
   const handleTutorChange = (tutorId: string) => {
-    selectTutor({ id: tutorId });
-    if (tutorId) {
+    const tutor = tutors.find(t => t.id === tutorId);
+    if (tutor) {
+      selectTutor(tutor);
       fetchTutorAvailability(tutorId);
     }
     setAvailableSlots([]);
@@ -91,7 +92,7 @@ export default function SchedulePage() {
     }
     
     // Generate time slots in 30-minute increments based on availability
-    const slots: {startTime: string, endTime: string}[] = [];
+    const slots: {start: string, end: string}[] = [];
     
     dayAvailabilities.forEach(availability => {
       const [startHour, startMinute] = availability.startTime.split(':').map(Number);
@@ -114,8 +115,8 @@ export default function SchedulePage() {
         // Don't add slots that end after the availability end time
         if (slotEnd.getTime() <= endDate.getTime()) {
           slots.push({
-            startTime: slotStart.toISOString(),
-            endTime: slotEnd.toISOString()
+            start: slotStart.toISOString(),
+            end: slotEnd.toISOString()
           });
         }
         
@@ -127,8 +128,8 @@ export default function SchedulePage() {
     // Filter out slots that conflict with existing appointments
     const tutorId = selectedTutor?.id;
     const filteredSlots = slots.filter(slot => {
-      const slotStart = new Date(slot.startTime).getTime();
-      const slotEnd = new Date(slot.endTime).getTime();
+      const slotStart = new Date(slot.start).getTime();
+      const slotEnd = new Date(slot.end).getTime();
       
       // Check if this slot conflicts with any existing appointment
       return !appointments.some(appointment => {
@@ -563,12 +564,12 @@ export default function SchedulePage() {
                         key={index}
                         onClick={() => selectTimeSlot(slot)}
                         className={`py-2 px-3 text-sm font-medium rounded-md ${
-                          selectedTimeSlot?.startTime === slot.startTime && selectedTimeSlot?.endTime === slot.endTime
+                          selectedTimeSlot?.start === slot.start && selectedTimeSlot?.end === slot.end
                             ? 'bg-spicy-red text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
-                        {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                        {formatTime(slot.start)} - {formatTime(slot.end)}
                       </button>
                     ))}
                   </div>

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import MainLayout from '../components/MainLayout';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function Login() {
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -129,5 +129,13 @@ export default function Login() {
         </div>
       </div>
     </MainLayout>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
