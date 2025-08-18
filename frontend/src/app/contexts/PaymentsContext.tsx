@@ -196,7 +196,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const completeManualPayment = async (transactionId: string, cryptoTxId?: string) => {
-    if (!token || !user?.role === 'admin') {
+    if (!token || user?.role !== 'admin') {
       setError('Unauthorized operation');
       return;
     }
