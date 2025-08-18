@@ -354,21 +354,23 @@ export class EmailService {
   
   // Mark reminder as sent in the database
   private async markReminderSent(appointmentId: string): Promise<void> {
-    const appointment = await this.appointmentRepository.findOne({ id: appointmentId });
+    const em = this.em.fork();
+    const appointment = await em.findOne(Appointment, { id: appointmentId });
     if (appointment) {
       appointment.reminderSent = true;
       appointment.reminderSentAt = new Date();
-      await this.em.flush();
+      await em.flush();
     }
   }
   
   // Mark day-before reminder as sent in the database
   private async markDayBeforeReminderSent(appointmentId: string): Promise<void> {
-    const appointment = await this.appointmentRepository.findOne({ id: appointmentId });
+    const em = this.em.fork();
+    const appointment = await em.findOne(Appointment, { id: appointmentId });
     if (appointment) {
       appointment.dayBeforeReminderSent = true;
       appointment.dayBeforeReminderSentAt = new Date();
-      await this.em.flush();
+      await em.flush();
     }
   }
   
