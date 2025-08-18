@@ -1,0 +1,294 @@
+Spicy Spanish Website – Full Technical Specifications
+1. Overview and Objectives
+Project Summary:
+Build a unified, responsive web application that serves as the public-facing site and the administrative dashboard for Carla’s Spanish language school. The platform will support three roles (Carla [admin], tutors, and students) and combine informational pages with scheduling, payments, and course management. Its core goals include ease of use, maintainability, and a warm, fun design aligned with the “Spicy Spanish” brand.
+
+Primary Objectives:
+
+Centralize scheduling, payments, and course management into one system.
+
+Allow role-based access: students self-register and manage their profiles, tutors provide their availability, and Carla manages transactions and course assignments.
+
+Integrate essential third-party services (Stripe, Solana-based crypto, Google Calendar, Google Analytics).
+
+Implement automated notifications and basic analytics with minimal but extensible code and documentation.
+
+2. Functional Requirements
+2.1 User Roles & Authentication
+User Types:
+
+Carla (Admin): Full control of all areas including tutor and student profiles, scheduling, transactions, email notifications, course assignments, and analytics.
+
+Tutors: Can create and update their profile, set availability, and view assigned student schedules.
+
+Students: Can self-register, edit their own profile, purchase classes, view their transaction history, download invoices, and view a visual calendar of their scheduled classes.
+
+Authentication & Permissions:
+
+Registration & Logins:
+
+Students: Self-register using standard forms. After registration, an email is sent to Carla notifying her of the new student.
+
+Tutors: Registration via manual invitation process. Carla sends an invitation email that includes a registration link (with a token) so the tutor can set a password and complete their profile.
+
+Carla: Admin account(s) with permissions to override or edit any student or tutor information.
+
+Permissions:
+
+Students can modify only their own profile.
+
+Tutors can modify only their own profile and set their availability.
+
+Only Carla can edit transaction records and assign students to tutors.
+
+Use best practices for role-based access control (RBAC) to secure endpoints appropriately.
+
+3. Core Feature Modules
+3.1 Scheduling & Calendar
+Availability Setup:
+
+Tutors can set recurring or one-off available time slots.
+
+Integration with external calendars (Google Calendar preferred). Allow tutors and students to sync/update events.
+
+Visual Calendar:
+
+A dynamic calendar view that adjusts to each user’s local time zone.
+
+Automatic detection of timezone using browser settings on registration and options for manual adjustment.
+
+Consider Daylight Saving Time adjustments, especially since most tutors are in Colombia and many students in the U.S.
+
+Scheduling functionality becomes available only after Carla assigns a student to a tutor.
+
+3.2 Payment and Transaction Management
+Payment Processing:
+
+Stripe Integration: Use Stripe Checkout with a custom-built page.
+
+Toggle between traditional credit card processing and crypto payments.
+
+For credit cards: display fields for card details.
+
+For crypto: enable wallet connection (using the Solana blockchain) for payment submission.
+
+Alternate Payment Methods:
+
+Manual updates for payments made via Zelle or PayPal.
+
+Real-time integration where possible to automatically update purchased hours.
+
+Transaction Records & Invoicing:
+
+Students have access to a personal transaction history.
+
+Invoice generation (downloadable as PDF) and automated emails when an invoice is sent.
+
+Carla can add/edit/delete transaction records manually (without notifying the student).
+
+Package Management:
+
+An interface for Carla to create/edit class packages (hours and pricing).
+
+Ability to update the number of purchased hours manually, with automatic email notifications to Carla for every new payment.
+
+3.3 Course & Curriculum Management
+Course Assignment:
+
+Carla can build courses (or series of courses) and assign them to students.
+
+A basic “curriculum builder” module where Carla can:
+
+Create or modify course outlines.
+
+Associate courses with a tutor when a student is assigned.
+
+The system should be flexible enough to support future enhancements similar to Ayotree’s curriculum features.
+
+Suggestion: Build a simple modular course editor now, with fields for course title, description, lesson outlines, and assignment status. This can be extended later for more advanced curriculum building.
+
+3.4 Email Notifications & Templating
+Triggers & Templates:
+
+New Student Registration: An automated email is sent to Carla.
+
+Tutor Invitation: Email to tutors with invitation link and registration instructions.
+
+Payment Notification: Carla gets notified for every payment made.
+
+Class Reminder: Automated email notification to students one hour before their class starts. This feature is configurable (enable/disable).
+
+Admin Panel: Provide an admin panel in Carla’s dashboard to customize email templates and scheduling settings. Templates will be in English only.
+
+Templating System:
+
+Use a server-side templating engine (e.g., Handlebars or similar) for email formats.
+
+Prepare default templates that can be modified via the admin panel.
+
+4. Technical Architecture
+4.1 Frontend
+Framework: Next.js
+
+Design & UI Guidelines:
+
+Branding and Look:
+
+Warm and fun aesthetic with a spicy feel (focus on reds and oranges).
+
+Reference: Magic Spoon for inspiration, but with a design that accentuates the “Spicy Spanish” brand.
+
+Responsive, mobile-first design ensuring usability across devices.
+
+Use smooth, engaging transitions without overcomplicating the UI.
+
+Pages & Components:
+
+Public-facing Pages: Home, About, Tutor Listing (team page with simple list view; Carla’s profile at the top), Contact.
+
+User Dashboard: Separate dashboards for students, tutors, and Carla (Admin).
+
+Calendar view, profile settings, payment history, course assignments.
+
+Checkout Page: Dynamic interface toggling between credit card and crypto payment (Solana blockchain integration).
+
+Google Analytics Integration: Embed Google Tag Manager on the frontend for tracking.
+
+4.2 Backend
+Framework: Nest.js
+
+Database: PostgreSQL, accessed via Mikro-ORM.
+
+Architecture and Code Organization:
+
+Follow a clean, modular monolithic pattern.
+
+Structure the codebase with clearly separated controllers, services, DAOs, and a domain/entity model.
+
+Keep interfaces and critical service endpoints well documented with minimal inline documentation (JSDoc/TSDoc style) where necessary.
+
+Configuration:
+
+Use a .env file to manage configuration variables (mail settings, database connection, Stripe API keys, etc.).
+
+Support multiple environments (development/production) with conditional settings such as enabling CORS in development.
+
+Job Scheduling & Email Services:
+
+Use Nest.js’s built-in scheduling features to handle email reminders and periodic tasks.
+
+Integrate a lightweight email templating system for dynamic content in emails.
+
+API Endpoints:
+
+Authentication endpoints for user registration, login, and profile updates.
+
+Endpoints for scheduling (CRUD operations on appointments, availability, and calendar events).
+
+Payment endpoints to facilitate Stripe and crypto payment processing.
+
+Administrative endpoints for transaction management, course assignments, and email template customization.
+
+5. UI/UX Design Guidelines
+5.1 Look and Feel
+Overall Aesthetic:
+
+Warm, fun, and engaging with a “spicy” visual vibe.
+
+Color Palette: Emphasis on reds, oranges, and complementary neutral tones.
+
+Typography: Choose fonts that are modern yet friendly; prioritize legibility.
+
+UI Elements:
+
+Navigation: Simple and clear menu structure with a responsive hamburger menu on mobile.
+
+Layouts: Clean card or grid layouts for tutor profiles and schedule displays.
+
+Interactive Elements: Use subtle animations/transitions when switching pages or toggling payment options.
+
+Branding:
+
+Revamp the existing logo to align with the new color scheme, keeping the essence of “Spicy Spanish.”
+
+Consistent imagery and iconography across the platform.
+
+Responsiveness & Accessibility:
+
+Ensure the design scales on mobile devices, tablets, and desktops.
+
+Follow accessibility guidelines (contrast ratios, ARIA labels, keyboard navigation support).
+
+5.2 Dashboard & Analytics
+Admin Dashboard (Carla’s Dashboard):
+
+Overview Panel:
+
+Basic analytics (number of active students, upcoming classes, pending tutor invites).
+
+Recent activity feed (new registrations, payments made, course assignments).
+
+Controls for Payments and Transactions:
+
+A user-friendly interface to view and manually update transactions.
+
+Course & Scheduling Management:
+
+Manage course assignments and view tutor/student schedules at a glance.
+
+Settings Panel:
+
+Configure email templates, scheduling parameters, and other system settings.
+
+6. Extensibility and Future-Proofing
+Modular Components:
+
+Design all major components (user management, scheduling, payments, courses) as modular so they can be extended or swapped out for new features (e.g., future CRM integration).
+
+Documentation & Code Practices:
+
+Minimal but clear inline documentation for major modules and interfaces.
+
+Document key service interfaces and APIs to support future developer onboarding.
+
+Use well-established design patterns to simplify future integrations (e.g., a modular service interface for payment processors to add other channels).
+
+Future Integrations:
+
+Prepare the course/curriculum module for future expansion (potentially integrating more features from Ayotree’s curriculum builder).
+
+Design the system to allow additional content sections (blogs, resource pages) with minimal changes.
+
+7. Deployment and Configuration
+Environment Management:
+
+Use a .env file for all configuration (development, staging, production).
+
+Enable CORS only in development; production should strictly limit origins.
+
+Build & Deployment:
+
+Use CI/CD pipelines for automated builds and tests.
+
+Code should run on standard Node.js runtime environments.
+
+Database migrations and backups handled via Mikro-ORM’s built-in mechanisms.
+
+Monitoring and Analytics:
+
+Integrate basic logging using Nest.js logging modules.
+
+Google Analytics via Google Tag Manager on the frontend to capture visitor activity and engagement.
+
+8. Final Guidance for the LLM Developer
+When you begin developing the system, please assume the role of a masterful engineer and UI designer. Here are a few key points to drive the implementation:
+
+Code Organization: Keep the codebase simple and monolithic for now. Focus on clear separation of concerns within controllers, services, and DAOs.
+
+UI/UX Excellence: The site should immediately feel friendly, warm, and engaging. Follow the design cues from Magic Spoon but align with a spicy, red-orange theme.
+
+Extensibility: Build a modular system that can accommodate future integrations (like additional payment gateways, advanced course building, or CRM integration).
+
+Testing & Best Practices: Ensure that all critical services (authentication, scheduling, and payment processing) are well-tested. Write testable, clean code and use industry best practices.
+
+Documentation & Maintainability: Provide minimal but clear documentation on major service interfaces and configuration settings to allow future developers to extend and maintain the system.
