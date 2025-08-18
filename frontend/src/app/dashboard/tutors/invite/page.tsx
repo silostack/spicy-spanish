@@ -32,7 +32,7 @@ export default function InviteTutorPage() {
       setLoading(true);
       setError(null);
       
-      await api.post('/users/tutors/invite', formData);
+      await api.post('/auth/invite/tutor', { email: formData.email });
       
       setSuccess(true);
       setFormData({
