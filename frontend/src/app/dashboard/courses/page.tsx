@@ -327,7 +327,7 @@ export default function CoursesPage() {
       </div>
 
       {/* Courses Table or Grid */}
-      {user.role === 'admin' ? (
+      {user?.role === 'admin' ? (
         // Admin view - Table
         <div className="bg-white rounded-xl shadow-md p-6 mb-6 overflow-hidden">
           <div className="overflow-x-auto">
