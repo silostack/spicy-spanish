@@ -150,7 +150,7 @@ export default function EmailTemplatesPage() {
       <h3>Receipt Details</h3>
       <p><strong>Package:</strong> {{packageName}}</p>
       <p><strong>Hours:</strong> {{hours}}</p>
-      <p><strong>Amount:</strong> ${{amount}}</p>
+      <p><strong>Amount:</strong> ${'{{amount}}'}</p>
       <p><strong>Transaction ID:</strong> {{transactionId}}</p>
     </div>
     <p>Your lesson hours have been added to your account and are ready to use.</p>

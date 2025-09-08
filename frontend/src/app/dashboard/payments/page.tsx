@@ -367,13 +367,6 @@ export default function PaymentsPage() {
       {/* Packages */}
       {activeTab === 'packages' && (
         <div>
-          {console.log('=== RENDER DEBUG ===', {
-            user,
-            userRole: user?.role,
-            isAdmin: user?.role === 'admin',
-            activeTab,
-            userLoaded
-          })}
           {user?.role === 'admin' ? (
             // Admin view - Enhanced Management Table
             <div>
