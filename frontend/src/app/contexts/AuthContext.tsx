@@ -86,11 +86,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log('User profile fetched successfully:', response.data);
       setUser(response.data);
+      
+      // Also save user to localStorage for other components
+      localStorage.setItem('user', JSON.stringify(response.data));
+      console.log('User saved to localStorage with role:', response.data.role);
+      
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Clear token on error
+      // Clear token and user on error
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       setToken(null);
       setIsLoading(false);
     }
@@ -165,6 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
     setToken(null);
     router.push('/login');
@@ -216,6 +223,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Update local user state with the response data
       setUser(response.data);
+      
+      // Also update localStorage
+      localStorage.setItem('user', JSON.stringify(response.data));
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;

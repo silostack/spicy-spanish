@@ -31,7 +31,8 @@ export default function PaymentsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<{ role: string }>({ role: '' });
+  const [user, setUser] = useState<{ role: string } | null>(null);
+  const [userLoaded, setUserLoaded] = useState(false);
   const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   
@@ -44,26 +45,48 @@ export default function PaymentsPage() {
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('creditCard');
 
+  // Load user data first
   useEffect(() => {
+    console.log('=== PAYMENTS PAGE DEBUG START ===');
+    console.log('1. Checking if window is defined:', typeof window !== 'undefined');
+    
     if (typeof window !== 'undefined') {
+      console.log('2. Window is defined, checking localStorage...');
       const storedUser = localStorage.getItem('user');
+      console.log('3. Raw localStorage user:', storedUser);
+      
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          console.log('Parsed user:', parsedUser); // Debug log
+          console.log('4. Parsed user object:', parsedUser);
+          console.log('5. User role specifically:', parsedUser.role);
+          console.log('6. Type of role:', typeof parsedUser.role);
+          console.log('7. Role === "admin"?', parsedUser.role === 'admin');
+          console.log('8. Role == "admin"?', parsedUser.role == 'admin');
           setUser(parsedUser);
+          console.log('9. User state set to:', parsedUser);
         } catch (e) {
-          console.error('Error parsing user data', e);
+          console.error('ERROR parsing user data', e);
         }
+      } else {
+        console.log('NO USER IN LOCALSTORAGE');
       }
+      setUserLoaded(true);
+      console.log('10. userLoaded set to true');
     }
+    console.log('=== PAYMENTS PAGE DEBUG END ===');
+  }, []);
 
+  // Fetch data after user is loaded
+  useEffect(() => {
+    if (!userLoaded) return;
+    
     if (activeTab === 'packages') {
       fetchPackages();
     } else {
       fetchTransactions();
     }
-  }, [activeTab, currentPage]);
+  }, [activeTab, currentPage, userLoaded]);
 
   const fetchPackages = async () => {
     try {
@@ -195,18 +218,9 @@ export default function PaymentsPage() {
   };
 
   const handlePackageSelect = (pkg: Package) => {
-    console.log('handlePackageSelect - User role:', user?.role); // Debug log
-    if (user?.role === 'admin') {
-      // Admin edits package
-      console.log('Opening edit modal for package:', pkg); // Debug log
-      setEditingPackage(pkg);
-      setEditModalOpen(true);
-    } else {
-      // Students purchase package
-      console.log('Opening checkout modal for package:', pkg); // Debug log
-      setSelectedPackage(pkg);
-      setCheckoutModalOpen(true);
-    }
+    // This function is now only used by students for checkout
+    setSelectedPackage(pkg);
+    setCheckoutModalOpen(true);
   };
 
   const handleCheckout = () => {
@@ -264,7 +278,8 @@ export default function PaymentsPage() {
     return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   };
 
-  if (loading && ((activeTab === 'packages' && packages.length === 0) || (activeTab === 'transactions' && transactions.length === 0))) {
+  // Show loading spinner while user data is being loaded
+  if (!userLoaded || (loading && ((activeTab === 'packages' && packages.length === 0) || (activeTab === 'transactions' && transactions.length === 0)))) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
@@ -274,18 +289,37 @@ export default function PaymentsPage() {
     );
   }
 
+  // Additional debug check at render time
+  if (typeof window !== 'undefined') {
+    const currentLocalStorage = localStorage.getItem('user');
+    console.log('=== AT RENDER TIME ===');
+    console.log('Current localStorage:', currentLocalStorage);
+    console.log('Current user state:', user);
+    console.log('States match?', JSON.stringify(user) === currentLocalStorage);
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* DEBUG: Remove this after fixing */}
+      {user && (
+        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded">
+          <strong>DEBUG - User Role:</strong> {user.role} | 
+          <strong> Type:</strong> {typeof user.role} |
+          <strong> View:</strong> {user.role === 'admin' ? 'ADMIN TABLE' : 'STUDENT CARDS'} |
+          <strong> Raw check:</strong> {`"${user.role}" === "admin"? ${user.role === 'admin'}`}
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-spicy-dark">Payments</h1>
           <p className="text-gray-600">
-            {user.role === 'admin' 
+            {user?.role === 'admin' 
               ? 'Manage packages and view transactions' 
               : 'View available packages and your transaction history'}
           </p>
         </div>
-        {user.role === 'admin' && activeTab === 'packages' && (
+        {user?.role === 'admin' && activeTab === 'packages' && (
           <Link
             href="/dashboard/payments/new-package"
             className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
@@ -333,85 +367,105 @@ export default function PaymentsPage() {
       {/* Packages */}
       {activeTab === 'packages' && (
         <div>
-          {user.role === 'admin' ? (
-            // Admin view - Table
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Hours
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Price
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {packages.length > 0 ? (
-                      packages.map((pkg) => (
-                        <tr key={pkg.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {pkg.name}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                            {pkg.description}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {pkg.hours} hours
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(pkg.price)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              pkg.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {pkg.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handlePackageSelect(pkg)}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                Edit
-                              </button>
+          {console.log('=== RENDER DEBUG ===', {
+            user,
+            userRole: user?.role,
+            isAdmin: user?.role === 'admin',
+            activeTab,
+            userLoaded
+          })}
+          {user?.role === 'admin' ? (
+            // Admin view - Enhanced Management Table
+            <div>
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-blue-800">
+                  <strong>Admin Package Management:</strong> Edit package details and toggle their availability.
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Package Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Description
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Hours/Month
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Price (USD)
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {packages.length > 0 ? (
+                        packages.map((pkg) => (
+                          <tr key={pkg.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {pkg.name}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 max-w-xs">
+                                {pkg.description}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {pkg.hours} hours
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                ${pkg.price}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <button
                                 onClick={() => togglePackageStatus(pkg.id, pkg.isActive)}
-                                className={pkg.isActive ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}
+                                className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
+                                  pkg.isActive
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                }`}
                               >
-                                {pkg.isActive ? 'Deactivate' : 'Activate'}
+                                {pkg.isActive ? 'Active' : 'Inactive'}
                               </button>
-                            </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <button
+                                onClick={() => {
+                                  setEditingPackage(pkg);
+                                  setEditModalOpen(true);
+                                }}
+                                className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                              >
+                                Edit Details
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                            No packages found. Click "Create Package" to add a new one.
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                          No packages found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           ) : (
@@ -440,7 +494,7 @@ export default function PaymentsPage() {
                         className="w-full bg-spicy-red hover:bg-spicy-orange text-white py-2 px-4 rounded-lg transition-colors"
                         onClick={() => handlePackageSelect(pkg)}
                       >
-                        {user?.role === 'admin' ? 'Edit Package' : 'Select Package'}
+                        Select Package
                       </button>
                     </div>
                   </div>
@@ -458,7 +512,7 @@ export default function PaymentsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {user.role === 'admin' && (
+                    {user?.role === 'admin' && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Student
                       </th>
@@ -487,7 +541,7 @@ export default function PaymentsPage() {
                   {transactions && transactions.length > 0 ? (
                     transactions.map((transaction) => (
                       <tr key={transaction.id}>
-                        {user.role === 'admin' && (
+                        {user?.role === 'admin' && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {transaction.studentName}
                           </td>
@@ -524,7 +578,7 @@ export default function PaymentsPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={user.role === 'admin' ? 7 : 6} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={user?.role === 'admin' ? 7 : 6} className="px-6 py-4 text-center text-gray-500">
                         No transactions found
                       </td>
                     </tr>
