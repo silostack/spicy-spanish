@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsOptional, MinLength, IsPhoneNumber } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsOptional, MinLength } from 'class-validator';
 
 export class RegisterStudentDto {
   @IsString()
@@ -22,7 +22,7 @@ export class RegisterStudentDto {
   @IsOptional()
   timezone?: string;
 
-  @IsPhoneNumber()
+  @IsString()
   @IsOptional()
   phoneNumber?: string;
 }

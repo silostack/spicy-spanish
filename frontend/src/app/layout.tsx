@@ -29,7 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${poppins.variable} ${montserrat.variable} font-sans min-h-screen w-full m-0 p-0`}>
+      <body 
+        className={`${poppins.variable} ${montserrat.variable} font-sans min-h-screen w-full m-0 p-0`}
+        suppressHydrationWarning
+      >
         <AppContextProvider>
           {children}
         </AppContextProvider>

@@ -286,13 +286,16 @@ export class EmailService {
   // Scheduled task that runs every 5 minutes to check for upcoming appointments
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sendScheduledReminders(): Promise<void> {
+    // Use a forked EntityManager for the scheduled task
+    const em = this.em.fork();
+    
     try {
       this.logger.log('Running scheduled email reminders check');
       
       // Get appointments starting in the next hour
       const now = new Date();
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
-      const reminder = await this.findUpcomingAppointmentsForReminder(now, oneHourFromNow);
+      const reminder = await this.findUpcomingAppointmentsForReminder(em, now, oneHourFromNow);
       
       if (reminder.length > 0) {
         this.logger.log(`Sending reminders for ${reminder.length} upcoming appointments`);
@@ -300,7 +303,7 @@ export class EmailService {
         for (const appointment of reminder) {
           try {
             await this.sendClassReminder(appointment);
-            await this.markReminderSent(appointment.id);
+            await this.markReminderSent(em, appointment.id);
             this.logger.log(`Sent reminder for appointment ${appointment.id}`);
           } catch (error) {
             this.logger.error(`Failed to send reminder for appointment ${appointment.id}: ${error.message}`);
@@ -310,7 +313,7 @@ export class EmailService {
       
       // Get appointments for 24 hour reminder
       const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const dayBefore = await this.findUpcomingAppointmentsForDayBeforeReminder(now, oneDayFromNow);
+      const dayBefore = await this.findUpcomingAppointmentsForDayBeforeReminder(em, now, oneDayFromNow);
       
       if (dayBefore.length > 0) {
         this.logger.log(`Sending day-before reminders for ${dayBefore.length} appointments`);
@@ -318,7 +321,7 @@ export class EmailService {
         for (const appointment of dayBefore) {
           try {
             await this.sendDayBeforeReminder(appointment);
-            await this.markDayBeforeReminderSent(appointment.id);
+            await this.markDayBeforeReminderSent(em, appointment.id);
             this.logger.log(`Sent day-before reminder for appointment ${appointment.id}`);
           } catch (error) {
             this.logger.error(`Failed to send day-before reminder for appointment ${appointment.id}: ${error.message}`);
@@ -327,12 +330,14 @@ export class EmailService {
       }
     } catch (error) {
       this.logger.error(`Error in scheduled reminder: ${error.message}`);
+    } finally {
+      await em.flush();
     }
   }
 
   // Method to find appointments that need reminders sent
-  private async findUpcomingAppointmentsForReminder(now: Date, cutoff: Date): Promise<Appointment[]> {
-    return this.appointmentRepository.find({
+  private async findUpcomingAppointmentsForReminder(em: EntityManager, now: Date, cutoff: Date): Promise<Appointment[]> {
+    return em.find(Appointment, {
       startTime: { $gte: now, $lte: cutoff },
       status: AppointmentStatus.SCHEDULED,
       reminderSent: false,
@@ -342,8 +347,8 @@ export class EmailService {
   }
 
   // Method to find appointments that need day-before reminders sent
-  private async findUpcomingAppointmentsForDayBeforeReminder(now: Date, cutoff: Date): Promise<Appointment[]> {
-    return this.appointmentRepository.find({
+  private async findUpcomingAppointmentsForDayBeforeReminder(em: EntityManager, now: Date, cutoff: Date): Promise<Appointment[]> {
+    return em.find(Appointment, {
       startTime: { $gte: now, $lte: cutoff },
       status: AppointmentStatus.SCHEDULED,
       dayBeforeReminderSent: false,
@@ -353,24 +358,22 @@ export class EmailService {
   }
   
   // Mark reminder as sent in the database
-  private async markReminderSent(appointmentId: string): Promise<void> {
-    const em = this.em.fork();
+  private async markReminderSent(em: EntityManager, appointmentId: string): Promise<void> {
     const appointment = await em.findOne(Appointment, { id: appointmentId });
     if (appointment) {
       appointment.reminderSent = true;
       appointment.reminderSentAt = new Date();
-      await em.flush();
+      // Flush will be handled by the calling method
     }
   }
   
   // Mark day-before reminder as sent in the database
-  private async markDayBeforeReminderSent(appointmentId: string): Promise<void> {
-    const em = this.em.fork();
+  private async markDayBeforeReminderSent(em: EntityManager, appointmentId: string): Promise<void> {
     const appointment = await em.findOne(Appointment, { id: appointmentId });
     if (appointment) {
       appointment.dayBeforeReminderSent = true;
       appointment.dayBeforeReminderSentAt = new Date();
-      await em.flush();
+      // Flush will be handled by the calling method
     }
   }
   

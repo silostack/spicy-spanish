@@ -52,8 +52,11 @@ export class AuthService {
   }
 
   async registerStudent(registerDto: RegisterStudentDto) {
+    console.log('📝 registerStudent called with:', registerDto);
+    
     const existingUser = await this.em.findOne(User, { email: registerDto.email });
     if (existingUser) {
+      console.log('❌ Email already exists:', registerDto.email);
       throw new ConflictException('Email already exists');
     }
 
@@ -69,7 +72,9 @@ export class AuthService {
     user.timezone = registerDto.timezone;
     user.phoneNumber = registerDto.phoneNumber;
 
+    console.log('💾 Attempting to save user:', user.email);
     await this.em.persistAndFlush(user);
+    console.log('✅ User saved successfully with ID:', user.id);
     
     // Try to send email, but don't fail registration if email fails
     try {

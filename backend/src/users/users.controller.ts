@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength, IsNumber, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -63,10 +64,12 @@ class UpdateUserDto {
 
 class StudentListQueryDto {
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   page?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   limit?: number;
 
