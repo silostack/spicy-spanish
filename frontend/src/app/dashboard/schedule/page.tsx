@@ -173,7 +173,6 @@ export default function SchedulePage() {
         type: 'success'
       });
     } catch (error) {
-      console.error('Error booking appointment:', error);
       setBookingError('Failed to book appointment. Please try again.');
     }
   };
@@ -193,7 +192,6 @@ export default function SchedulePage() {
           type: 'success'
         });
       } catch (error) {
-        console.error('Error cancelling appointment:', error);
         addNotification({
           message: 'Failed to cancel lesson',
           type: 'error'

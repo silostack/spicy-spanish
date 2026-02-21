@@ -48,7 +48,7 @@ export default function InviteTutorPage() {
       }, 3000);
       
     } catch (error: any) {
-      console.error('Error inviting tutor:', error);
+
       setError(error.response?.data?.message || 'Failed to send invitation');
     } finally {
       setLoading(false);

@@ -108,7 +108,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       setTutors(response.data);
     } catch (error) {
-      console.error('Error fetching tutors:', error);
+
       setError('Failed to fetch tutors');
     } finally {
       setIsLoading(false);
@@ -130,7 +130,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       setAvailabilities(response.data);
     } catch (error) {
-      console.error('Error fetching tutor availability:', error);
+
       setError('Failed to fetch tutor availability');
     } finally {
       setIsLoading(false);
@@ -162,7 +162,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       setAppointments(response.data);
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+
       setError('Failed to fetch appointments');
     } finally {
       setIsLoading(false);
@@ -193,7 +193,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       setCourses(response.data);
     } catch (error) {
-      console.error('Error fetching courses:', error);
+
       setError('Failed to fetch courses');
     } finally {
       setIsLoading(false);
@@ -254,7 +254,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
         type: 'success',
       });
     } catch (error) {
-      console.error('Error booking appointment:', error);
+
       setError('Failed to book appointment');
       
       addNotification({
@@ -287,7 +287,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
         type: 'success',
       });
     } catch (error) {
-      console.error('Error cancelling appointment:', error);
+
       setError('Failed to cancel appointment');
       
       addNotification({

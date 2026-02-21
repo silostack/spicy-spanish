@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { User, UserRole } from './entities/user.entity';
@@ -28,6 +28,8 @@ interface StudentWithDetails extends User {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: EntityRepository<User>,
@@ -126,17 +128,15 @@ export class UsersService {
   }
 
   async getStudentsWithPagination(query: StudentListQuery = {}) {
-    console.log('🔧 UsersService.getStudentsWithPagination called with:', query);
-    const { 
-      page = 1, 
-      limit = 10, 
-      search = '', 
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
       filter = 'all',
-      tutorId 
+      tutorId
     } = query;
 
     const offset = (page - 1) * limit;
-    console.log('🔧 Pagination params:', { page, limit, offset, search, filter, tutorId });
     
     // Build base criteria
     const criteria: any = { role: UserRole.STUDENT };
@@ -230,17 +230,7 @@ export class UsersService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
-    
-    console.log('🔧 getStudentsWithPagination returning:', {
-      itemsCount: enrichedStudents.length,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      resultType: typeof result,
-      resultKeys: Object.keys(result)
-    });
-    
+
     return result;
   }
 
@@ -276,7 +266,12 @@ export class UsersService {
     
     // Calculate hours
     const totalHoursPurchased = transactions.reduce((total, t) => total + t.hours, 0);
-    const hoursUsed = appointments.filter(a => a.status === 'completed').length; // Assuming 1 hour per appointment
+    const hoursUsed = appointments
+      .filter(a => a.status === 'completed')
+      .reduce((total, a) => {
+        const durationMs = new Date(a.endTime).getTime() - new Date(a.startTime).getTime();
+        return total + durationMs / (1000 * 60 * 60);
+      }, 0);
     const availableHours = totalHoursPurchased - hoursUsed;
     
     return {

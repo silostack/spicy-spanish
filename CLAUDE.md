@@ -28,6 +28,10 @@ npm run test          # Run unit tests
 npm run test:watch    # Run tests in watch mode
 npm run test:e2e      # Run end-to-end tests
 npm run seed          # Seed the database
+npm run migration:create  # Create a new migration from schema changes
+npm run migration:up      # Run pending migrations
+npm run migration:down    # Revert last migration
+npm run migration:pending # List pending migrations
 ```
 
 ## Architecture Overview
@@ -37,6 +41,7 @@ npm run seed          # Seed the database
 - Configuration in `backend/src/mikro-orm.config.ts`
 - Entities follow the pattern `*.entity.ts`
 - Database seeding via `npm run seed`
+- Migrations in `backend/src/migrations/` — run `npm run migration:create` after entity changes
 
 ### Authentication & Authorization
 - JWT-based authentication with Passport strategies
@@ -50,7 +55,7 @@ The backend follows NestJS module architecture:
 - `users/` - User management
 - `courses/` - Course and lesson management
 - `scheduling/` - Appointments and availability
-- `payments/` - Stripe and Solana payment processing
+- `payments/` - Stripe payment processing
 - `email/` - Email notifications with Handlebars templates
 - `admin/` - Administrative functions
 
@@ -60,7 +65,7 @@ The backend follows NestJS module architecture:
 - All contexts exported through `contexts/index.tsx`
 
 ### Key Integrations
-- **Payments**: Stripe for credit cards, Solana for crypto
+- **Payments**: Stripe for credit cards
 - **Calendar**: Google Calendar integration for scheduling
 - **Email**: Nodemailer with Handlebars templates
 - **Styling**: Tailwind CSS with custom components in `components/ui/`

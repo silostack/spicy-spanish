@@ -84,7 +84,6 @@ const AttendanceOverviewPage = () => {
 
       await fetchStats();
     } catch (error: any) {
-      console.error('Error fetching initial data:', error);
       setError('Failed to load attendance data');
     } finally {
       setIsLoading(false);
@@ -110,7 +109,6 @@ const AttendanceOverviewPage = () => {
       // Fetch recent attendance records
       await fetchRecentAttendance();
     } catch (error: any) {
-      console.error('Error fetching stats:', error);
       setError('Failed to load attendance statistics');
     }
   };
@@ -149,7 +147,7 @@ const AttendanceOverviewPage = () => {
 
       setRecentAttendance(attendanceData.slice(0, 10));
     } catch (error: any) {
-      console.error('Error fetching recent attendance:', error);
+      // Error handled by state
     }
   };
 

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +11,8 @@ import { RegisterTutorDto } from './dto/register-tutor.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly em: EntityManager,
     private readonly jwtService: JwtService,
@@ -52,11 +54,8 @@ export class AuthService {
   }
 
   async registerStudent(registerDto: RegisterStudentDto) {
-    console.log('📝 registerStudent called with:', registerDto);
-    
     const existingUser = await this.em.findOne(User, { email: registerDto.email });
     if (existingUser) {
-      console.log('❌ Email already exists:', registerDto.email);
       throw new ConflictException('Email already exists');
     }
 
@@ -72,15 +71,13 @@ export class AuthService {
     user.timezone = registerDto.timezone;
     user.phoneNumber = registerDto.phoneNumber;
 
-    console.log('💾 Attempting to save user:', user.email);
     await this.em.persistAndFlush(user);
-    console.log('✅ User saved successfully with ID:', user.id);
-    
+
     // Try to send email, but don't fail registration if email fails
     try {
       await this.emailService.sendNewStudentRegistrationEmail(user);
     } catch (error) {
-      console.error('Failed to send registration email:', error);
+      this.logger.error(`Failed to send registration email to ${user.email}`, error.stack);
     }
 
     const { password: _, ...result } = user;
@@ -130,7 +127,7 @@ export class AuthService {
     try {
       await this.emailService.sendTutorInvitation(email, invitationToken);
     } catch (error) {
-      console.error('Failed to send tutor invitation email:', error);
+      this.logger.error(`Failed to send tutor invitation email to ${email}`, error.stack);
     }
 
     return { message: 'Invitation sent successfully' };

@@ -17,53 +17,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
-import { PaymentMethod, TransactionStatus } from './entities/transaction.entity';
 import { Request } from 'express';
-
-// DTOs
-class CreatePackageDto {
-  name: string;
-  description: string;
-  hours: number;
-  priceUsd: number;
-  isActive?: boolean;
-}
-
-class UpdatePackageDto {
-  name?: string;
-  description?: string;
-  hours?: number;
-  priceUsd?: number;
-  isActive?: boolean;
-}
-
-class CreateTransactionDto {
-  studentId: string;
-  packageId?: string;
-  amountUsd: number;
-  hours: number;
-  paymentMethod: PaymentMethod;
-  status?: TransactionStatus;
-  notes?: string;
-}
-
-class StripeCheckoutDto {
-  packageId: string;
-  studentId: string;
-  successUrl: string;
-  cancelUrl: string;
-}
-
-class CryptoCheckoutDto {
-  packageId: string;
-  studentId: string;
-  successUrl: string;
-  walletAddress?: string;
-}
-
-class CompleteManualPaymentDto {
-  cryptoTransactionId?: string;
-}
+import { CreatePackageDto, UpdatePackageDto, CreateTransactionDto, StripeCheckoutDto } from './dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -170,24 +125,11 @@ export class PaymentsController {
     return this.paymentsService.handleStripeWebhook(signature, request.rawBody);
   }
 
-  // Crypto payment endpoints
-  @Post('crypto/checkout')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  createCryptoCheckout(@Body() checkoutDto: CryptoCheckoutDto) {
-    return this.paymentsService.createCryptoCheckout(checkoutDto);
-  }
-
   @Post('transactions/:id/complete')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  completeManualPayment(
-    @Param('id') transactionId: string,
-    @Body() completePaymentDto: CompleteManualPaymentDto
-  ) {
-    return this.paymentsService.completeManualPayment(
-      transactionId,
-      completePaymentDto.cryptoTransactionId
-    );
+  completeManualPayment(@Param('id') transactionId: string) {
+    return this.paymentsService.completeManualPayment(transactionId);
   }
 
   // Stats

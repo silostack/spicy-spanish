@@ -68,8 +68,6 @@ export default function AddStudentPage() {
         router.push('/dashboard/students');
       }, 2000);
     } catch (error: any) {
-      console.error('Error creating student:', error);
-      console.error('Error response:', error.response?.data);
       setError(error.response?.data?.message || 'Failed to create student account');
     } finally {
       setIsLoading(false);

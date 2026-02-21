@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -7,6 +7,8 @@ import { User } from '../../users/entities/user.entity';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly em: EntityManager,
@@ -19,26 +21,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    console.log('JWT Strategy validating payload:', payload);
-    
     if (!payload.sub) {
-      console.error('Missing sub (user id) in JWT payload');
+      this.logger.error('Missing sub (user id) in JWT payload');
       return null;
     }
-    
+
     const user = await this.em.findOne(User, { id: payload.sub });
-    
+
     if (!user) {
-      console.error(`User with id ${payload.sub} not found`);
+      this.logger.error(`User with id ${payload.sub} not found`);
       return null;
     }
-    
-    console.log('User found from token:', {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    });
-    
+
     return user;
   }
 }

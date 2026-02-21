@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Logger } from '@nestjs/common';
 import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength, IsNumber, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UsersService } from './users.service';
@@ -85,6 +85,8 @@ class StudentListQueryDto {
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
@@ -96,15 +98,12 @@ export class UsersController {
   @Get('students')
   @Roles(UserRole.ADMIN)
   getStudents(@Query() query: StudentListQueryDto) {
-    console.log('🎯 UsersController.getStudents called with query:', query);
     // Convert string query params to numbers
     const parsedQuery = {
       ...query,
       page: query.page ? Number(query.page) : undefined,
       limit: query.limit ? Number(query.limit) : undefined,
     };
-    console.log('🎯 Parsed query:', parsedQuery);
-    console.log('🎯 Calling getStudentsWithPagination...');
     return this.usersService.getStudentsWithPagination(parsedQuery);
   }
 
@@ -147,11 +146,8 @@ export class UsersController {
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.TUTOR, UserRole.STUDENT)
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    console.log('Update user request received:');
-    console.log('User ID:', id);
-    console.log('Request body:', updateUserDto);
-    console.log('Request body keys:', Object.keys(updateUserDto));
-    
+    this.logger.log(`Updating user ${id}`);
+
     // Transform the DTO to match User entity types
     const updateData: any = { ...updateUserDto };
     

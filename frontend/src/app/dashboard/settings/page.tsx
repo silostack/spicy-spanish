@@ -43,7 +43,6 @@ const ProfileSettings = () => {
       // Optionally refresh user data in context
       window.location.reload();
     } catch (error) {
-      console.error('Error updating profile:', error);
       setMessage('Error updating profile. Please try again.');
     } finally {
       setIsLoading(false);

@@ -43,38 +43,21 @@ export default function PaymentsPage() {
   // Checkout modal state
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('creditCard');
 
   // Load user data first
   useEffect(() => {
-    console.log('=== PAYMENTS PAGE DEBUG START ===');
-    console.log('1. Checking if window is defined:', typeof window !== 'undefined');
-    
     if (typeof window !== 'undefined') {
-      console.log('2. Window is defined, checking localStorage...');
       const storedUser = localStorage.getItem('user');
-      console.log('3. Raw localStorage user:', storedUser);
-      
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          console.log('4. Parsed user object:', parsedUser);
-          console.log('5. User role specifically:', parsedUser.role);
-          console.log('6. Type of role:', typeof parsedUser.role);
-          console.log('7. Role === "admin"?', parsedUser.role === 'admin');
-          console.log('8. Role == "admin"?', parsedUser.role == 'admin');
           setUser(parsedUser);
-          console.log('9. User state set to:', parsedUser);
         } catch (e) {
-          console.error('ERROR parsing user data', e);
+          // Invalid user data in localStorage
         }
-      } else {
-        console.log('NO USER IN LOCALSTORAGE');
       }
       setUserLoaded(true);
-      console.log('10. userLoaded set to true');
     }
-    console.log('=== PAYMENTS PAGE DEBUG END ===');
   }, []);
 
   // Fetch data after user is loaded
@@ -106,8 +89,6 @@ export default function PaymentsPage() {
       setPackages(mappedPackages);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching packages:', error);
-      
       // Fallback to default packages matching the seeder
       setPackages([
         {
@@ -162,38 +143,12 @@ export default function PaymentsPage() {
       setTotalPages(Math.ceil(response.data.total / 10));
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
       setError('Failed to load transactions');
       setLoading(false);
-      
-      // Fallback to mock data for demo purposes
-      setTransactions([
-        {
-          id: '1',
-          studentId: '1',
-          studentName: 'John Doe',
-          packageId: '2',
-          packageName: 'Regular Package',
-          amount: 230,
-          status: 'completed',
-          createdAt: '2025-03-10T12:00:00Z',
-          paymentMethod: 'Credit Card'
-        },
-        {
-          id: '2',
-          studentId: '1',
-          studentName: 'John Doe',
-          packageId: '1',
-          packageName: 'Starter Package',
-          amount: 125,
-          status: 'completed',
-          createdAt: '2025-02-05T15:30:00Z',
-          paymentMethod: 'Crypto'
-        }
-      ]);
+
+      setTransactions([]);
       setTotalPages(1);
       setLoading(false);
-      setError(null);
     }
   };
 
@@ -212,7 +167,6 @@ export default function PaymentsPage() {
         )
       );
     } catch (error) {
-      console.error('Error toggling package status:', error);
       alert('Failed to update package status');
     }
   };
@@ -224,12 +178,11 @@ export default function PaymentsPage() {
   };
 
   const handleCheckout = () => {
-    // In a real app, this would process the payment
-    alert(`Payment processed for ${selectedPackage?.name} using ${paymentMethod === 'creditCard' ? 'Credit Card' : 'Crypto'}`);
+    // TODO: Wire to Stripe checkout (Phase 2)
+    alert(`Payment processed for ${selectedPackage?.name}`);
     setCheckoutModalOpen(false);
     setSelectedPackage(null);
-    
-    // Refresh the transaction list after successful payment
+
     if (activeTab !== 'transactions') {
       setActiveTab('transactions');
     } else {
@@ -289,27 +242,8 @@ export default function PaymentsPage() {
     );
   }
 
-  // Additional debug check at render time
-  if (typeof window !== 'undefined') {
-    const currentLocalStorage = localStorage.getItem('user');
-    console.log('=== AT RENDER TIME ===');
-    console.log('Current localStorage:', currentLocalStorage);
-    console.log('Current user state:', user);
-    console.log('States match?', JSON.stringify(user) === currentLocalStorage);
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* DEBUG: Remove this after fixing */}
-      {user && (
-        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded">
-          <strong>DEBUG - User Role:</strong> {user.role} | 
-          <strong> Type:</strong> {typeof user.role} |
-          <strong> View:</strong> {user.role === 'admin' ? 'ADMIN TABLE' : 'STUDENT CARDS'} |
-          <strong> Raw check:</strong> {`"${user.role}" === "admin"? ${user.role === 'admin'}`}
-        </div>
-      )}
-      
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-spicy-dark">Payments</h1>
@@ -731,86 +665,17 @@ export default function PaymentsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
             <h2 className="text-xl font-semibold mb-4">Checkout</h2>
-            
+
             <div className="mb-6 bg-gray-50 p-4 rounded-md">
               <h3 className="font-medium mb-2">{selectedPackage.name}</h3>
               <p className="text-gray-600 mb-2">{selectedPackage.hours} hours</p>
               <p className="text-xl font-bold">{formatCurrency(selectedPackage.price)}</p>
             </div>
-            
-            <div className="mb-6">
-              <h3 className="font-medium mb-3">Payment Method</h3>
-              <div className="flex space-x-4">
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md border ${
-                    paymentMethod === 'creditCard'
-                      ? 'border-spicy-red bg-spicy-light text-spicy-red'
-                      : 'border-gray-300'
-                  }`}
-                  onClick={() => setPaymentMethod('creditCard')}
-                >
-                  Credit Card
-                </button>
-                <button
-                  className={`flex-1 py-2 px-4 rounded-md border ${
-                    paymentMethod === 'crypto'
-                      ? 'border-spicy-red bg-spicy-light text-spicy-red'
-                      : 'border-gray-300'
-                  }`}
-                  onClick={() => setPaymentMethod('crypto')}
-                >
-                  Crypto
-                </button>
-              </div>
-            </div>
-            
-            {paymentMethod === 'creditCard' ? (
-              <div className="mb-6 space-y-4">
-                <div>
-                  <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                    Card Number
-                  </label>
-                  <input
-                    type="text"
-                    id="cardNumber"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
-                    placeholder="1234 5678 9012 3456"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="expiration" className="block text-sm font-medium text-gray-700 mb-1">
-                      Expiration Date
-                    </label>
-                    <input
-                      type="text"
-                      id="expiration"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
-                      placeholder="MM/YY"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">
-                      CVV
-                    </label>
-                    <input
-                      type="text"
-                      id="cvv"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spicy-red"
-                      placeholder="123"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-6 text-center">
-                <p className="mb-4">Connect your wallet to proceed with payment.</p>
-                <button className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100">
-                  Connect Wallet
-                </button>
-              </div>
-            )}
-            
+
+            <p className="text-sm text-gray-600 mb-6">
+              You will be redirected to Stripe to complete your payment securely.
+            </p>
+
             <div className="flex justify-end space-x-4">
               <button
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100"
@@ -822,7 +687,7 @@ export default function PaymentsPage() {
                 className="px-4 py-2 bg-spicy-red text-white rounded-md hover:bg-opacity-90"
                 onClick={handleCheckout}
               >
-                Complete Payment
+                Pay with Card
               </button>
             </div>
           </div>

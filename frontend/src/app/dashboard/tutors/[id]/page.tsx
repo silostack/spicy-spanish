@@ -45,7 +45,7 @@ export default function TutorViewPage() {
       const response = await api.get(`/users/${tutorId}`);
       setTutor(response.data);
     } catch (error: any) {
-      console.error('Error fetching tutor:', error);
+
       setError(error.response?.data?.message || 'Failed to load tutor details');
     } finally {
       setLoading(false);

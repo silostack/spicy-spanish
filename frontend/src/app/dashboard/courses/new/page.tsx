@@ -35,12 +35,8 @@ const CreateCoursePage = () => {
       // Success - redirect to courses page
       router.push('/dashboard/courses');
     } catch (error: any) {
-      console.error('Error creating course:', error);
-      
       // Check if it's a validation error from backend
       if (error.response?.status === 400 || error.response?.status === 404) {
-        // For demo purposes, simulate success even if backend fails
-        console.log('Backend validation failed, simulating success for demo');
         
         // Show success message
         setError('');

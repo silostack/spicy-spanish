@@ -94,7 +94,7 @@ export default function TutorEditPage() {
         isActive: tutorData.isActive,
       });
     } catch (error: any) {
-      console.error('Error fetching tutor:', error);
+
       setError(error.response?.data?.message || 'Failed to load tutor details');
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function TutorEditPage() {
       }, 2000);
       
     } catch (error: any) {
-      console.error('Error updating tutor:', error);
+
       setError(error.response?.data?.message || 'Failed to update tutor');
     } finally {
       setSaving(false);

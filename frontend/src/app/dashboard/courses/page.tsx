@@ -49,8 +49,6 @@ export default function CoursesPage() {
       setTotalPages(Math.ceil((response.data?.total || 0) / 10));
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching courses:', error);
-      
       // Use mock data when backend fails
       const mockCourses: Course[] = [
         {
@@ -171,7 +169,6 @@ export default function CoursesPage() {
         )
       );
     } catch (error) {
-      console.error('Error toggling course status:', error);
       alert('Failed to update course status');
     }
   };

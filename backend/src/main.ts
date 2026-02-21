@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   
@@ -38,11 +40,14 @@ async function bootstrap() {
     });
   }
 
+  // Global exception filter
+  app.useGlobalFilters(new AllExceptionsFilter());
+
   // Global prefix
   app.setGlobalPrefix('api');
 
   const port = configService.get('PORT') || 3001;
   await app.listen(port);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  logger.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

@@ -38,8 +38,6 @@ export default function EmailTemplatesPage() {
       setTemplates(response.data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching templates:', error);
-      
       // Use mock data for demonstration
       const mockTemplates: EmailTemplate[] = [
         {

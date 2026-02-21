@@ -85,7 +85,7 @@ export default function TutorAvailabilityPage() {
       setTutor(tutorResponse.data);
       setAvailability(availabilityResponse.data);
     } catch (error: any) {
-      console.error('Error fetching data:', error);
+
       setError(error.response?.data?.message || 'Failed to load availability');
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function TutorAvailabilityPage() {
       
       await fetchTutorAndAvailability();
     } catch (error: any) {
-      console.error('Error saving availability:', error);
+
       setError(error.response?.data?.message || 'Failed to save availability');
     } finally {
       setSaving(false);
@@ -161,7 +161,7 @@ export default function TutorAvailabilityPage() {
       await api.delete(`/scheduling/availability/${slotId}`);
       await fetchTutorAndAvailability();
     } catch (error: any) {
-      console.error('Error deleting availability:', error);
+
       setError(error.response?.data?.message || 'Failed to delete availability');
     }
   };

@@ -83,7 +83,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
       setCourses(response.data);
     } catch (error) {
-      console.error('Error fetching courses:', error);
+
       setError('Failed to fetch courses');
     } finally {
       setIsLoading(false);
@@ -105,7 +105,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       setStudentCourses(response.data);
     } catch (error) {
-      console.error('Error fetching student courses:', error);
+
       setError('Failed to fetch your enrolled courses');
     } finally {
       setIsLoading(false);
@@ -126,7 +126,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
       setCurrentCourse(response.data);
     } catch (error) {
-      console.error('Error fetching course details:', error);
+
       setError('Failed to fetch course details');
     } finally {
       setIsLoading(false);
@@ -146,7 +146,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       
       setCurrentLesson(response.data);
     } catch (error) {
-      console.error('Error fetching lesson:', error);
+
       setError('Failed to fetch lesson');
     } finally {
       setIsLoading(false);
@@ -169,7 +169,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Refresh student courses after enrollment
       await fetchStudentCourses();
     } catch (error) {
-      console.error('Error enrolling in course:', error);
+
       setError('Failed to enroll in course');
       throw error;
     } finally {
@@ -193,7 +193,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Refresh student courses to update progress
       await fetchStudentCourses();
     } catch (error) {
-      console.error('Error updating lesson progress:', error);
+
       setError('Failed to update lesson progress');
     } finally {
       setIsLoading(false);

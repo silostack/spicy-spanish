@@ -18,9 +18,6 @@ api.interceptors.request.use(
       const token = localStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Adding token to request:', config.url);
-      } else {
-        console.log('No token found for request:', config.url);
       }
     }
     return config;
@@ -58,19 +55,16 @@ export const authService = {
       const response = await api.get('/auth/test');
       return response.data;
     } catch (error) {
-      console.error('API connection test failed:', error);
+      // Error handled by caller
       throw error;
     }
   },
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    console.log(`Sending login request to: ${API_URL}/auth/login`);
     const response = await api.post<LoginResponse>('/auth/login', { email, password });
     return response.data;
   },
   
   registerStudent: async (data: RegisterData) => {
-    console.log(`Sending registration request to: ${API_URL}/auth/register/student`);
-    console.log('Registration data:', data);
     const response = await api.post('/auth/register/student', data);
     return response.data;
   },

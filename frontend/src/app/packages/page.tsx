@@ -29,8 +29,6 @@ export default function Packages() {
       const response = await api.get('/payments/packages/active');
       setPackages(response.data);
     } catch (error) {
-      console.error('Error fetching packages:', error);
-      
       // Fallback to default packages if backend fails
       const defaultPackages: Package[] = [
         {

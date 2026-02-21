@@ -66,7 +66,6 @@ export default function Dashboard() {
             fetchUserDashboardData();
           }
         } catch (e) {
-          console.error('Error parsing user data', e);
           setLoading(false);
           setError('Error loading user data');
         }
@@ -82,7 +81,6 @@ export default function Dashboard() {
       setData(response.data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching admin dashboard data:', error);
       setError('Error loading dashboard data');
       setLoading(false);
     }

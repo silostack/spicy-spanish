@@ -85,7 +85,7 @@ export default function TutorsPage() {
       setTotalPages(Math.ceil(total / limit));
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching tutors:', error);
+
       setError('Failed to load tutors');
       setTutors([]);
       setLoading(false);
@@ -111,7 +111,7 @@ export default function TutorsPage() {
       await api.post(`/users/tutors/${tutorId}/resend-invitation`);
       alert('Invitation resent successfully');
     } catch (error) {
-      console.error('Error resending invitation:', error);
+
       alert('Failed to resend invitation');
     }
   };
@@ -122,7 +122,7 @@ export default function TutorsPage() {
       // Refresh the tutors list
       fetchTutors();
     } catch (error) {
-      console.error('Error updating user status:', error);
+
       alert('Failed to update user status');
     }
   };

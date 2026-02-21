@@ -1,53 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Package } from './entities/package.entity';
 import { Transaction, TransactionStatus, PaymentMethod } from './entities/transaction.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import Stripe from 'stripe';
-
-interface CreatePackageDto {
-  name: string;
-  description: string;
-  hours: number;
-  priceUsd: number;
-  isActive?: boolean;
-}
-
-interface UpdatePackageDto {
-  name?: string;
-  description?: string;
-  hours?: number;
-  priceUsd?: number;
-  isActive?: boolean;
-}
-
-interface CreateTransactionDto {
-  studentId: string;
-  packageId?: string;
-  amountUsd: number;
-  hours: number;
-  paymentMethod: PaymentMethod;
-  status?: TransactionStatus;
-  notes?: string;
-}
-
-interface StripeCheckoutDto {
-  packageId: string;
-  studentId: string;
-  successUrl: string;
-  cancelUrl: string;
-}
-
-interface CryptoCheckoutDto {
-  packageId: string;
-  studentId: string;
-  successUrl: string;
-  walletAddress?: string;
-}
+import { CreatePackageDto, UpdatePackageDto, CreateTransactionDto, StripeCheckoutDto } from './dto';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   private stripe: Stripe;
 
   constructor(
@@ -365,11 +327,11 @@ export class PaymentsService {
           return this.handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
         
         default:
-          console.log(`Unhandled event type: ${event.type}`);
+          this.logger.log(`Unhandled Stripe event type: ${event.type}`);
           return { received: true };
       }
     } catch (error) {
-      console.error('Webhook error:', error.message);
+      this.logger.error(`Stripe webhook error: ${error.message}`, error.stack);
       throw new BadRequestException(`Webhook Error: ${error.message}`);
     }
   }
@@ -417,57 +379,8 @@ export class PaymentsService {
     return { success: true };
   }
 
-  // Crypto checkout methods
-  async createCryptoCheckout(checkoutDto: CryptoCheckoutDto) {
-    const student = await this.userRepository.findOne({ 
-      id: checkoutDto.studentId,
-      role: UserRole.STUDENT 
-    });
-    
-    if (!student) {
-      throw new NotFoundException(`Student with ID ${checkoutDto.studentId} not found`);
-    }
-    
-    const pkg = await this.packageRepository.findOne({ id: checkoutDto.packageId });
-    if (!pkg) {
-      throw new NotFoundException(`Package with ID ${checkoutDto.packageId} not found`);
-    }
-    
-    if (!pkg.isActive) {
-      throw new BadRequestException('This package is no longer available for purchase');
-    }
-    
-    // Create a pending transaction
-    const transaction = new Transaction(
-      student,
-      pkg.priceUsd,
-      pkg.hours,
-      PaymentMethod.CRYPTO,
-      TransactionStatus.PENDING,
-      pkg
-    );
-    
-    // Set the wallet address for payment if provided
-    const walletAddress = checkoutDto.walletAddress || process.env.DEFAULT_SOLANA_WALLET;
-    
-    if (walletAddress) {
-      transaction.notes = `Payment to wallet: ${walletAddress}`;
-    }
-    
-    await this.em.persistAndFlush(transaction);
-    
-    // This would be replaced with actual Solana integration
-    // For now, return info needed for crypto payment
-    return {
-      transactionId: transaction.id,
-      amountUsd: pkg.priceUsd,
-      walletAddress: walletAddress,
-      successUrl: `${checkoutDto.successUrl}?transaction_id=${transaction.id}`,
-    };
-  }
-
-  // Manual payment completion (for crypto and other manual payments)
-  async completeManualPayment(transactionId: string, cryptoTransactionId?: string) {
+  // Manual payment completion (for admin to mark payments as complete)
+  async completeManualPayment(transactionId: string) {
     const transaction = await this.findTransactionById(transactionId);
     
     if (transaction.status !== TransactionStatus.PENDING) {
@@ -475,11 +388,7 @@ export class PaymentsService {
     }
     
     transaction.status = TransactionStatus.COMPLETED;
-    
-    if (cryptoTransactionId) {
-      transaction.cryptoTransactionId = cryptoTransactionId;
-    }
-    
+
     await this.em.flush();
     return transaction;
   }

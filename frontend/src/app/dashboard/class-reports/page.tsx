@@ -101,7 +101,6 @@ const ClassReportsPage = () => {
 
       setClassReports(reportsMap);
     } catch (error: any) {
-      console.error('Error fetching appointments:', error);
       setError('Failed to load completed lessons');
     } finally {
       setIsLoading(false);
@@ -159,7 +158,6 @@ const ClassReportsPage = () => {
       setShowReportForm(false);
       setSelectedAppointment(null);
     } catch (error: any) {
-      console.error('Error submitting report:', error);
       setError('Failed to save class report');
     } finally {
       setIsSubmitting(false);

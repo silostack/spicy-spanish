@@ -5,39 +5,7 @@ import { Course, LearningLevel } from './entities/course.entity';
 import { CourseLesson } from './entities/course-lesson.entity';
 import { StudentCourse } from './entities/student-course.entity';
 import { User, UserRole } from '../users/entities/user.entity';
-
-interface CreateCourseDto {
-  title: string;
-  description: string;
-  learningLevel: LearningLevel;
-  isActive?: boolean;
-}
-
-interface UpdateCourseDto {
-  title?: string;
-  description?: string;
-  learningLevel?: LearningLevel;
-  isActive?: boolean;
-}
-
-interface CreateLessonDto {
-  courseId: string;
-  title: string;
-  content: string;
-  order: number;
-}
-
-interface UpdateLessonDto {
-  title?: string;
-  content?: string;
-  order?: number;
-}
-
-interface AssignCourseDto {
-  courseId: string;
-  studentId: string;
-  tutorId: string;
-}
+import { CreateCourseDto, UpdateCourseDto, CreateLessonDto, UpdateLessonDto, AssignCourseDto } from './dto';
 
 @Injectable()
 export class CoursesService {

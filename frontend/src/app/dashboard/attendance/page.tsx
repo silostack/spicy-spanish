@@ -93,7 +93,6 @@ const AttendancePage = () => {
 
       setAttendanceRecords(attendanceMap);
     } catch (error: any) {
-      console.error('Error fetching appointments:', error);
       setError('Failed to load appointments');
     } finally {
       setIsLoading(false);
@@ -130,7 +129,6 @@ const AttendancePage = () => {
         setAttendanceRecords(prev => new Map(prev.set(appointmentId, newAttendance)));
       }
     } catch (error: any) {
-      console.error('Error marking attendance:', error);
       setError('Failed to mark attendance');
     }
   };

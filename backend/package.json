@@ -17,7 +17,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "migration:create": "npx mikro-orm migration:create",
+    "migration:up": "npx mikro-orm migration:up",
+    "migration:down": "npx mikro-orm migration:down",
+    "migration:pending": "npx mikro-orm migration:pending"
   },
   "dependencies": {
     "@mikro-orm/cli": "^5.9.8",
@@ -34,7 +38,6 @@
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^3.0.1",
-    "@solana/web3.js": "^1.78.4",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",

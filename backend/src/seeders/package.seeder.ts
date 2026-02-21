@@ -1,5 +1,8 @@
+import { Logger } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/core';
 import { Package } from '../payments/entities/package.entity';
+
+const logger = new Logger('PackageSeeder');
 
 export const defaultPackages = [
   {
@@ -33,14 +36,14 @@ export const defaultPackages = [
 ];
 
 export async function seedPackages(em: EntityManager): Promise<void> {
-  console.log('🌱 Checking packages...');
-  
+  logger.log('Checking packages...');
+
   // Check if packages already exist
   const existingPackages = await em.find(Package, {});
-  
+
   if (existingPackages.length === 0) {
-    console.log('📦 No packages found, creating default packages...');
-    
+    logger.log('No packages found, creating default packages...');
+
     for (const pkgData of defaultPackages) {
       const pkg = new Package(
         pkgData.name,
@@ -49,14 +52,14 @@ export async function seedPackages(em: EntityManager): Promise<void> {
         pkgData.priceUsd,
         pkgData.isActive
       );
-      
+
       em.persist(pkg);
-      console.log(`✅ Created package: ${pkg.name} (${pkg.hours} hours - $${pkg.priceUsd})`);
+      logger.log(`Created package: ${pkg.name} (${pkg.hours} hours - $${pkg.priceUsd})`);
     }
-    
+
     await em.flush();
-    console.log('✅ Default packages created successfully');
+    logger.log('Default packages created successfully');
   } else {
-    console.log(`📦 Found ${existingPackages.length} existing packages, skipping seed`);
+    logger.log(`Found ${existingPackages.length} existing packages, skipping seed`);
   }
 }

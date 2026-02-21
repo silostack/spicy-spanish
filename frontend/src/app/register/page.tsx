@@ -70,7 +70,6 @@ export default function Register() {
       
       // Redirect will be handled by the auth context after successful registration
     } catch (err: any) {
-      console.error('Registration error:', err);
       setError(err.response?.data?.message || `Error: ${err.message || 'An error occurred during registration. Please try again.'}`);
     }
   };

@@ -52,7 +52,6 @@ export default function AvailabilityPage() {
         
         fetchAvailability(parsedUser.id);
       } catch (e) {
-        console.error('Error parsing user data', e);
         setError('Error loading user data');
         setLoading(false);
       }
@@ -67,7 +66,6 @@ export default function AvailabilityPage() {
       setAvailabilities(response.data);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching availability:', error);
       setError('Failed to load availability data');
       setLoading(false);
     }
@@ -148,7 +146,6 @@ export default function AvailabilityPage() {
       fetchAvailability(user.id);
       setShowForm(false);
     } catch (error) {
-      console.error('Error saving availability:', error);
       setFormError('Failed to save availability');
     }
   };
@@ -160,7 +157,6 @@ export default function AvailabilityPage() {
         // Refresh the data
         fetchAvailability(user.id);
       } catch (error) {
-        console.error('Error deleting availability:', error);
         setError('Failed to delete availability');
       }
     }

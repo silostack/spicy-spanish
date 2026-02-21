@@ -1,87 +1,29 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Delete, 
-  Body, 
-  Param, 
-  Query, 
-  UseGuards 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards
 } from '@nestjs/common';
 import { SchedulingService } from './scheduling.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
-import { AppointmentStatus } from './entities/appointment.entity';
-import { AttendanceStatus } from './entities/attendance.entity';
-
-// DTO interfaces for type safety
-interface CreateAppointmentDto {
-  studentId: string;
-  tutorId: string;
-  startTime: Date;
-  endTime: Date;
-  courseId?: string;
-  notes?: string;
-}
-
-interface UpdateAppointmentDto {
-  startTime?: Date;
-  endTime?: Date;
-  status?: AppointmentStatus;
-  courseId?: string;
-  notes?: string;
-}
-
-interface CreateAvailabilityDto {
-  tutorId: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  isRecurring?: boolean;
-  specificDate?: Date;
-}
-
-interface UpdateAvailabilityDto {
-  dayOfWeek?: number;
-  startTime?: string;
-  endTime?: string;
-  isRecurring?: boolean;
-  specificDate?: Date;
-}
-
-interface CreateAttendanceDto {
-  appointmentId: string;
-  studentId: string;
-  status: AttendanceStatus;
-  notes?: string;
-  markedByTutor?: boolean;
-}
-
-interface UpdateAttendanceDto {
-  status?: AttendanceStatus;
-  notes?: string;
-}
-
-interface CreateClassReportDto {
-  appointmentId: string;
-  tutorId: string;
-  subject: string;
-  content: string;
-  homeworkAssigned?: string;
-  studentProgress?: string;
-  nextLessonNotes?: string;
-}
-
-interface UpdateClassReportDto {
-  subject?: string;
-  content?: string;
-  homeworkAssigned?: string;
-  studentProgress?: string;
-  nextLessonNotes?: string;
-}
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
+  CreateAvailabilityDto,
+  UpdateAvailabilityDto,
+  CreateAttendanceDto,
+  UpdateAttendanceDto,
+  CreateClassReportDto,
+  UpdateClassReportDto,
+} from './dto';
 
 @Controller('scheduling')
 @UseGuards(JwtAuthGuard, RolesGuard)

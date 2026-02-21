@@ -47,53 +47,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check for token in localStorage on initial load
     const storedToken = localStorage.getItem('token');
-    console.log('Looking for stored token on initial load');
-    
+
     if (storedToken) {
       try {
         // Validate token and set user
         const decoded: any = jwtDecode(storedToken);
-        console.log('Token decoded:', decoded);
         const currentTime = Date.now() / 1000;
-        
+
         if (decoded.exp && decoded.exp > currentTime) {
-          console.log('Token is valid, expires at:', new Date(decoded.exp * 1000).toLocaleString());
           setToken(storedToken);
           // Fetch user data to get full profile
           fetchUserData(storedToken);
         } else {
           // Token expired
-          console.log('Token expired, removing from storage');
           localStorage.removeItem('token');
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error decoding token:', error);
+        // Error handled by state
         localStorage.removeItem('token');
         setIsLoading(false);
       }
     } else {
-      console.log('No token found in localStorage');
       setIsLoading(false);
     }
   }, []);
 
   const fetchUserData = async (authToken: string) => {
     try {
-      console.log('Fetching user profile with token');
       // Let the interceptor add the token instead of adding it here
       const response = await api.get('/auth/profile');
-      
-      console.log('User profile fetched successfully:', response.data);
+
       setUser(response.data);
-      
+
       // Also save user to localStorage for other components
       localStorage.setItem('user', JSON.stringify(response.data));
-      console.log('User saved to localStorage with role:', response.data.role);
-      
+
       setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching user data:', error);
       // Clear token and user on error
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -105,27 +96,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      console.log('Attempting login with:', { email });
       const response = await api.post('/auth/login', { email, password });
       const { access_token } = response.data;
 
-      console.log('Login successful, received token');
-      
       // Store token in localStorage and state
       localStorage.setItem('token', access_token);
       setToken(access_token);
-      
+
       // Decode token to get basic user data
       const decoded: any = jwtDecode(access_token);
-      console.log('Token decoded, role:', decoded.role);
-      
+
       // Fetch user data with the new token
       await fetchUserData(access_token);
       
       // All users go to dashboard regardless of role for now
       router.push('/dashboard');
     } catch (error) {
-      console.error('Login error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -136,11 +122,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       // Determine which registration endpoint to use based on role
-      const endpoint = userData.role === 'tutor' 
-        ? '/auth/register/tutor' 
+      const endpoint = userData.role === 'tutor'
+        ? '/auth/register/tutor'
         : '/auth/register/student';
-      
-      console.log(`Registering user with endpoint: ${endpoint}`);
+
       const response = await api.post(endpoint, userData);
       
       // Check if the response has access_token (for consistency with login)
@@ -148,11 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newToken = response.data.access_token || response.data.token;
       
       if (!newToken) {
-        console.error('No token received from registration!', response.data);
         throw new Error('Registration successful but no token received');
       }
-      
-      console.log('Registration successful, received token');
+
       localStorage.setItem('token', newToken);
       setToken(newToken);
       
@@ -162,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (error) {
-      console.error('Registration error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -212,9 +194,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       
-      console.log('Sending user update data:', transformedData);
-      console.log('Data keys:', Object.keys(transformedData));
-      
       const response = await api.patch(`/users/${user.id}`, transformedData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -227,7 +206,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Also update localStorage
       localStorage.setItem('user', JSON.stringify(response.data));
     } catch (error) {
-      console.error('Error updating user:', error);
       throw error;
     } finally {
       setIsLoading(false);

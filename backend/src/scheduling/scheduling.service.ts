@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { Appointment, AppointmentStatus } from './entities/appointment.entity';
@@ -8,78 +8,20 @@ import { ClassReport } from './entities/class-report.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Course } from '../courses/entities/course.entity';
 import { EmailService } from '../email/email.service';
-
-// can't install these
-// import { google, calendar_v3 } from 'googleapis';
-// import { OAuth2Client } from 'google-auth-library';
-
-interface CreateAppointmentDto {
-  studentId: string;
-  tutorId: string;
-  startTime: Date;
-  endTime: Date;
-  courseId?: string;
-  notes?: string;
-}
-
-interface UpdateAppointmentDto {
-  startTime?: Date;
-  endTime?: Date;
-  status?: AppointmentStatus;
-  courseId?: string;
-  notes?: string;
-}
-
-interface CreateAvailabilityDto {
-  tutorId: string;
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-  isRecurring?: boolean;
-  specificDate?: Date;
-}
-
-interface UpdateAvailabilityDto {
-  dayOfWeek?: number;
-  startTime?: string;
-  endTime?: string;
-  isRecurring?: boolean;
-  specificDate?: Date;
-}
-
-interface CreateAttendanceDto {
-  appointmentId: string;
-  studentId: string;
-  status: AttendanceStatus;
-  notes?: string;
-  markedByTutor?: boolean;
-}
-
-interface UpdateAttendanceDto {
-  status?: AttendanceStatus;
-  notes?: string;
-}
-
-interface CreateClassReportDto {
-  appointmentId: string;
-  tutorId: string;
-  subject: string;
-  content: string;
-  homeworkAssigned?: string;
-  studentProgress?: string;
-  nextLessonNotes?: string;
-}
-
-interface UpdateClassReportDto {
-  subject?: string;
-  content?: string;
-  homeworkAssigned?: string;
-  studentProgress?: string;
-  nextLessonNotes?: string;
-}
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
+  CreateAvailabilityDto,
+  UpdateAvailabilityDto,
+  CreateAttendanceDto,
+  UpdateAttendanceDto,
+  CreateClassReportDto,
+  UpdateClassReportDto,
+} from './dto';
 
 @Injectable()
 export class SchedulingService {
+  private readonly logger = new Logger(SchedulingService.name);
   // private calendar: calendar_v3.Calendar;
   private readonly calendarId: string;
 
@@ -269,7 +211,7 @@ export class SchedulingService {
       appointment.confirmationEmailSent = true;
       await this.em.flush();
     } catch (error) {
-      console.error('Failed to send confirmation email:', error);
+      this.logger.error('Failed to send confirmation email', error.stack);
       // Don't fail the appointment creation if email fails
     }
     
@@ -347,7 +289,7 @@ export class SchedulingService {
     try {
       await this.emailService.sendClassCancellationEmail(appointment);
     } catch (error) {
-      console.error('Failed to send cancellation email:', error);
+      this.logger.error('Failed to send cancellation email', error.stack);
       // Don't fail the appointment cancellation if email fails
     }
     
@@ -543,7 +485,7 @@ export class SchedulingService {
       // return response.data.id || null;
       return null;
     } catch (error) {
-      console.error('Error creating Google Calendar event:', error);
+      this.logger.error('Error creating Google Calendar event', error.stack);
       return null;
     }
   }
@@ -588,7 +530,7 @@ export class SchedulingService {
 
       return true;
     } catch (error) {
-      console.error('Error updating Google Calendar event:', error);
+      this.logger.error('Error updating Google Calendar event', error.stack);
       return false;
     }
   }
@@ -606,7 +548,7 @@ export class SchedulingService {
 
       return true;
     } catch (error) {
-      console.error('Error cancelling Google Calendar event:', error);
+      this.logger.error('Error cancelling Google Calendar event', error.stack);
       return false;
     }
   }

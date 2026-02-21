@@ -29,10 +29,7 @@ interface ApiResponse {
 
 // Main Component
 export default function StudentsPage() {
-  console.log('🚀 StudentsPage component rendering');
-  
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
-  console.log('🔐 Auth state:', { user, authLoading, isAuthenticated });
   
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,36 +46,17 @@ export default function StudentsPage() {
 
   // Load students when user is available
   useEffect(() => {
-    console.log('👀 useEffect triggered - user changed:', { user });
-    
     if (user) {
-      console.log('✅ User available, fetching students');
       fetchStudents();
-    } else {
-      console.log('❌ No user available yet');
     }
   }, [user, currentPage, filter]);
 
-  // Debug auth loading changes
-  useEffect(() => {
-    console.log('🔄 Auth loading state changed:', authLoading);
-  }, [authLoading]);
-
-  // Debug authentication changes
-  useEffect(() => {
-    console.log('🔒 Authentication state changed:', isAuthenticated);
-  }, [isAuthenticated]);
-
   const fetchStudents = async () => {
-    console.log('🔍 fetchStudents called');
-    
     if (!user) {
-      console.log('❌ No user available for fetchStudents');
       return;
     }
-    
+
     try {
-      console.log('⏳ Starting to fetch students...');
       setLoading(true);
       setError(null);
       
@@ -100,51 +78,26 @@ export default function StudentsPage() {
       }
       
       const fullUrl = `${endpoint}?${params.toString()}`;
-      console.log('🌐 Making API call to:', fullUrl);
-      console.log('👤 User role:', user.role);
-      console.log('🆔 User ID:', user.id);
-      
+
       const response = await api.get<ApiResponse>(fullUrl);
-      console.log('✅ API response received:', response.data);
-      console.log('📊 Response data type:', typeof response.data);
-      console.log('📊 Response data keys:', Object.keys(response.data || {}));
-      console.log('📊 Is array:', Array.isArray(response.data));
       
       // Handle both direct array response and paginated response
       if (Array.isArray(response.data)) {
         // Backend returned students directly as array
-        console.log('📊 Handling direct array response');
         setStudents(response.data);
         setTotal(response.data.length);
         setTotalPages(1);
       } else if (response.data && response.data.items) {
         // Backend returned paginated response
-        console.log('📊 Handling paginated response');
         setStudents(response.data.items);
         setTotal(response.data.total);
         setTotalPages(response.data.totalPages);
       } else {
-        console.error('📊 Unexpected response format:', response.data);
         throw new Error('Unexpected response format from server');
       }
-      
-      console.log('📊 Students state updated:', {
-        count: Array.isArray(response.data) ? response.data.length : response.data?.items?.length || 0,
-        total: Array.isArray(response.data) ? response.data.length : response.data?.total || 0,
-        totalPages: Array.isArray(response.data) ? 1 : response.data?.totalPages || 1
-      });
-      
+
     } catch (error: any) {
-      console.error('💥 Error fetching students:', error);
-      console.error('💥 Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText
-      });
-      
       // Use mock data when backend fails
-      console.log('📊 Using mock data due to backend error');
       const mockStudents: Student[] = [
         {
           id: '1',
@@ -234,37 +187,30 @@ export default function StudentsPage() {
       setTotalPages(1);
       setError(null); // Clear error since we're showing mock data
     } finally {
-      console.log('🏁 fetchStudents completed, setting loading to false');
       setLoading(false);
     }
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 Search triggered with term:', searchTerm);
     setCurrentPage(1);
     fetchStudents();
   };
 
   const handleFilterChange = (newFilter: 'all' | 'active' | 'inactive' | 'new') => {
-    console.log('🔄 Filter changed from', filter, 'to', newFilter);
     setFilter(newFilter);
     setCurrentPage(1);
   };
 
   const handlePageChange = (page: number) => {
-    console.log('📄 Page changed from', currentPage, 'to', page);
     setCurrentPage(page);
   };
 
   const toggleStudentStatus = async (studentId: string, currentStatus: boolean) => {
-    console.log('🔄 Toggling student status:', { studentId, currentStatus });
     try {
       await api.patch(`/users/${studentId}`, { isActive: !currentStatus });
-      console.log('✅ Student status updated successfully');
       await fetchStudents(); // Refresh the list
     } catch (error) {
-      console.error('💥 Error updating student status:', error);
       alert('Failed to update student status');
     }
   };
@@ -287,17 +233,8 @@ export default function StudentsPage() {
     return isActive ? 'Active' : 'Inactive';
   };
 
-  // Debug all loading conditions
-  console.log('🔍 Checking loading conditions:', {
-    authLoading,
-    user: !!user,
-    loading,
-    isAuthenticated
-  });
-
   // Show loading spinner while auth is loading or students are loading
   if (authLoading) {
-    console.log('⏳ Showing auth loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -309,7 +246,6 @@ export default function StudentsPage() {
   }
 
   if (!user && !authLoading) {
-    console.log('❌ No user and not loading - should redirect');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -320,7 +256,6 @@ export default function StudentsPage() {
   }
 
   if (loading) {
-    console.log('⏳ Showing data loading spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -333,7 +268,6 @@ export default function StudentsPage() {
 
   // Show error message
   if (error) {
-    console.log('💥 Showing error message:', error);
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md w-full">
@@ -341,7 +275,6 @@ export default function StudentsPage() {
           <p className="text-red-600">{error}</p>
           <button
             onClick={() => {
-              console.log('🔄 Retry button clicked');
               fetchStudents();
             }}
             className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
@@ -355,7 +288,6 @@ export default function StudentsPage() {
 
   // Check if user has permission to view students
   if (user && user.role !== 'admin' && user.role !== 'tutor') {
-    console.log('🚫 User does not have permission to view students:', user.role);
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md w-full">
@@ -365,14 +297,6 @@ export default function StudentsPage() {
       </div>
     );
   }
-
-  console.log('🎉 Rendering students page with data:', {
-    studentsCount: students.length,
-    userRole: user?.role,
-    total,
-    currentPage,
-    totalPages
-  });
 
   return (
     <div className="min-h-screen bg-gray-50">

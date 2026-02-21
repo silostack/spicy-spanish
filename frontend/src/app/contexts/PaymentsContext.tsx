@@ -40,13 +40,6 @@ interface StripeCheckoutResponse {
   transactionId: string;
 }
 
-interface CryptoCheckoutResponse {
-  transactionId: string;
-  amountUsd: number;
-  walletAddress: string;
-  successUrl: string;
-}
-
 interface PaymentsContextType {
   packages: Package[];
   transactions: Transaction[];
@@ -57,8 +50,7 @@ interface PaymentsContextType {
   fetchTransactions: () => Promise<void>;
   selectPackage: (pkg: Package) => void;
   initiateStripeCheckout: () => Promise<StripeCheckoutResponse | null>;
-  initiateCryptoPayment: () => Promise<CryptoCheckoutResponse | null>;
-  completeManualPayment: (transactionId: string, cryptoTxId?: string) => Promise<void>;
+  completeManualPayment: (transactionId: string) => Promise<void>;
 }
 
 const PaymentsContext = createContext<PaymentsContextType | undefined>(undefined);
@@ -81,7 +73,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
       const response = await api.get('/payments/packages/active');
       setPackages(response.data);
     } catch (error) {
-      console.error('Error fetching packages:', error);
+
       setError('Failed to fetch packages');
     } finally {
       setIsLoading(false);
@@ -111,7 +103,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setTransactions(response.data);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+
       setError('Failed to fetch transactions');
     } finally {
       setIsLoading(false);
@@ -145,7 +137,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       return response.data;
     } catch (error) {
-      console.error('Error initiating Stripe checkout:', error);
+
       setError('Failed to initiate payment');
       
       addNotification({
@@ -159,43 +151,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  const initiateCryptoPayment = async (): Promise<CryptoCheckoutResponse | null> => {
-    if (!token || !user || !selectedPackage) {
-      setError('Missing required payment information');
-      return null;
-    }
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.post('/payments/crypto/checkout', {
-        packageId: selectedPackage.id,
-        studentId: user.id,
-        successUrl: `${window.location.origin}/dashboard/payments/crypto-success`,
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error initiating crypto payment:', error);
-      setError('Failed to initiate crypto payment');
-      
-      addNotification({
-        message: 'Failed to initiate crypto payment',
-        type: 'error',
-      });
-      
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const completeManualPayment = async (transactionId: string, cryptoTxId?: string) => {
+  const completeManualPayment = async (transactionId: string) => {
     if (!token || user?.role !== 'admin') {
       setError('Unauthorized operation');
       return;
@@ -205,8 +161,8 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
       setIsLoading(true);
       setError(null);
       
-      await api.post(`/payments/transactions/${transactionId}/complete`, 
-        { cryptoTransactionId: cryptoTxId }, 
+      await api.post(`/payments/transactions/${transactionId}/complete`,
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -222,7 +178,7 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
         type: 'success',
       });
     } catch (error) {
-      console.error('Error completing manual payment:', error);
+
       setError('Failed to complete payment');
       
       addNotification({
@@ -255,7 +211,6 @@ export const PaymentsProvider: React.FC<{ children: ReactNode }> = ({ children }
         fetchTransactions,
         selectPackage,
         initiateStripeCheckout,
-        initiateCryptoPayment,
         completeManualPayment,
       }}
     >
