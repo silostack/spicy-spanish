@@ -77,8 +77,35 @@ cd backend
 ./setup-db.sh
 ```
 
+## Docker
+
+Run the full stack locally with Docker Compose:
+```bash
+docker compose up --build        # Build and start all services
+docker compose up -d             # Detached mode
+docker compose down              # Stop all services
+docker compose down -v           # Stop and remove volumes (wipes DB)
+```
+
+Services:
+- **frontend** → http://localhost:3000
+- **backend**  → http://localhost:3001
+- **postgres** → localhost:5432
+
+Environment variables for Docker are read from a `.env` file at the repo root. See `backend/.env.example` for required vars.
+
+## CI/CD
+
+GitHub Actions runs on every push/PR to `main`:
+- **Backend**: lint → test (198 unit tests) → build
+- **Frontend**: lint → build
+
+## Health Check
+
+`GET /api/health` returns `{ status: "ok", timestamp: "..." }` — used by Docker and deployment platforms.
+
 ## Important Notes
-- Frontend runs on port 8008 (not default 3000)
+- Frontend runs on port 8008 in dev (port 3000 in Docker/production)
 - Backend expects PostgreSQL with environment variables for MikroORM
-- No existing CLAUDE.md file was found, so this is the initial version
-- No Cursor or Copilot rules were found in the codebase
+- Rate limiting is enabled (100 requests per minute per IP via @nestjs/throttler)
+- CORS in production restricts to `FRONTEND_URL` env var

@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/c
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
@@ -11,6 +12,7 @@ import { EmailModule } from './email/email.module';
 import { AdminModule } from './admin/admin.module';
 import { SeederModule } from './seeders/seeder.module';
 import { ContactModule } from './contact/contact.module';
+import { HealthModule } from './health/health.module';
 import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
 
 @Module({
@@ -18,6 +20,10 @@ import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -43,8 +49,9 @@ import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
     CoursesModule,
     EmailModule,
     AdminModule,
-    SeederModule, // Add seeder module
+    SeederModule,
     ContactModule,
+    HealthModule,
   ],
 })
 export class AppModule implements NestModule {
