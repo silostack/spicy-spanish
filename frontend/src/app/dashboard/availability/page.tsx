@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
 interface Availability {
@@ -16,18 +16,17 @@ interface Availability {
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function AvailabilityPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, isLoading: authLoading } = useAuth();
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     dayOfWeek: 1, // Monday
     startTime: '09:00',
@@ -37,28 +36,17 @@ export default function AvailabilityPage() {
   });
 
   useEffect(() => {
-    // Get the user from localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        
-        if (parsedUser.role !== 'tutor') {
-          setError('Only tutors can access this page');
-          setLoading(false);
-          return;
-        }
-        
-        fetchAvailability(parsedUser.id);
-      } catch (e) {
-        setError('Error loading user data');
-        setLoading(false);
-      }
-    } else {
-      router.push('/login');
+    if (authLoading) return;
+    if (!user) return;
+
+    if (user.role !== 'tutor') {
+      setError('Only tutors can access this page');
+      setLoading(false);
+      return;
     }
-  }, [router]);
+
+    fetchAvailability(user.id);
+  }, [user, authLoading]);
 
   const fetchAvailability = async (tutorId: string) => {
     try {
@@ -127,9 +115,10 @@ export default function AvailabilityPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    if (!user) return;
+
     if (!validateForm()) return;
-    
+
     try {
       if (isEditing && editId) {
         // Update existing availability
@@ -141,7 +130,7 @@ export default function AvailabilityPage() {
           tutorId: user.id,
         });
       }
-      
+
       // Refresh the availability data
       fetchAvailability(user.id);
       setShowForm(false);
@@ -151,6 +140,7 @@ export default function AvailabilityPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!user) return;
     if (window.confirm('Are you sure you want to delete this availability?')) {
       try {
         await api.delete(`/scheduling/availability/${id}`);

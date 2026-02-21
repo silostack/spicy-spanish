@@ -75,11 +75,11 @@ const AttendanceOverviewPage = () => {
       // Fetch students and tutors for filter dropdowns (admin only)
       if (user?.role === 'admin') {
         const [studentsResponse, tutorsResponse] = await Promise.all([
-          api.get('/users?role=student'),
-          api.get('/users?role=tutor'),
+          api.get('/users/students'),
+          api.get('/users/tutors'),
         ]);
-        setStudents(studentsResponse.data || []);
-        setTutors(tutorsResponse.data || []);
+        setStudents(studentsResponse.data?.items || studentsResponse.data || []);
+        setTutors(Array.isArray(tutorsResponse.data) ? tutorsResponse.data : (tutorsResponse.data?.items || []));
       }
 
       await fetchStats();

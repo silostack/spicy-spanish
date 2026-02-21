@@ -35,107 +35,34 @@ export default function CoursesPage() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/courses', {
-        params: {
-          page: currentPage,
-          limit: 10,
-          filter,
-          search: searchTerm || undefined,
-        },
-      });
-      
-      // Ensure courses is always an array
-      setCourses(response.data?.items || []);
-      setTotalPages(Math.ceil((response.data?.total || 0) / 10));
-      setLoading(false);
-    } catch (error) {
-      // Use mock data when backend fails
-      const mockCourses: Course[] = [
-        {
-          id: '1',
-          title: 'Spanish for Beginners',
-          description: 'Start your Spanish journey with essential vocabulary, basic grammar, and everyday conversations.',
-          learningLevel: 'beginner',
-          lessonsCount: 20,
-          studentsCount: 45,
-          createdAt: '2025-01-15T10:00:00Z',
-          isActive: true
-        },
-        {
-          id: '2',
-          title: 'Conversational Spanish',
-          description: 'Build confidence in real-world Spanish conversations with practical dialogues and cultural insights.',
-          learningLevel: 'intermediate',
-          lessonsCount: 25,
-          studentsCount: 32,
-          createdAt: '2025-01-20T14:30:00Z',
-          isActive: true
-        },
-        {
-          id: '3',
-          title: 'Business Spanish',
-          description: 'Master professional Spanish for the workplace, including business vocabulary and formal communication.',
-          learningLevel: 'advanced',
-          lessonsCount: 30,
-          studentsCount: 18,
-          createdAt: '2025-02-01T09:15:00Z',
-          isActive: true
-        },
-        {
-          id: '4',
-          title: 'Spanish Grammar Fundamentals',
-          description: 'Deep dive into Spanish grammar rules, verb conjugations, and sentence structure.',
-          learningLevel: 'beginner',
-          lessonsCount: 15,
-          studentsCount: 28,
-          createdAt: '2025-02-10T11:00:00Z',
-          isActive: true
-        },
-        {
-          id: '5',
-          title: 'Spanish for Travel',
-          description: 'Essential Spanish phrases and cultural tips for travelers exploring Spanish-speaking countries.',
-          learningLevel: 'beginner',
-          lessonsCount: 10,
-          studentsCount: 52,
-          createdAt: '2025-02-15T16:45:00Z',
-          isActive: false
-        },
-        {
-          id: '6',
-          title: 'Advanced Spanish Literature',
-          description: 'Explore Spanish and Latin American literature while enhancing advanced language skills.',
-          learningLevel: 'advanced',
-          lessonsCount: 20,
-          studentsCount: 12,
-          createdAt: '2025-03-01T13:20:00Z',
-          isActive: true
-        }
-      ];
-      
-      // Apply filters to mock data
-      let filteredCourses = mockCourses;
-      
+      setError(null);
+      const response = await api.get('/courses');
+
+      let allCourses: Course[] = Array.isArray(response.data) ? response.data : (response.data?.items || []);
+
+      // Client-side filtering
       if (filter === 'active') {
-        filteredCourses = mockCourses.filter(c => c.isActive);
+        allCourses = allCourses.filter(c => c.isActive);
       } else if (filter === 'inactive') {
-        filteredCourses = mockCourses.filter(c => !c.isActive);
+        allCourses = allCourses.filter(c => !c.isActive);
       } else if (filter === 'beginner' || filter === 'intermediate' || filter === 'advanced') {
-        filteredCourses = mockCourses.filter(c => c.learningLevel === filter);
+        allCourses = allCourses.filter(c => c.learningLevel === filter);
       }
-      
-      // Apply search filter
+
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        filteredCourses = filteredCourses.filter(c =>
+        allCourses = allCourses.filter(c =>
           c.title.toLowerCase().includes(search) ||
           c.description.toLowerCase().includes(search)
         );
       }
-      
-      setCourses(filteredCourses);
-      setTotalPages(1);
-      setError(null);
+
+      setCourses(allCourses);
+      setTotalPages(Math.ceil(allCourses.length / 10));
+      setLoading(false);
+    } catch (err: any) {
+      setError('Failed to load courses');
+      setCourses([]);
       setLoading(false);
     }
   };

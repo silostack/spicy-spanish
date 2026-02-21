@@ -97,7 +97,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       setIsLoading(true);
       setError(null);
       
-      const response = await api.get(`/courses/student/${user.id}`, {
+      const response = await api.get(`/courses/assignments/student/${user.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -160,7 +160,7 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
       setIsLoading(true);
       setError(null);
       
-      await api.post('/courses/enroll', { courseId }, {
+      await api.post('/courses/assignments', { studentId: user.id, courseId }, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
