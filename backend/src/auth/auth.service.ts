@@ -105,6 +105,48 @@ export class AuthService {
     return result;
   }
 
+  async forgotPassword(email: string) {
+    const user = await this.em.findOne(User, { email });
+
+    // Always return success to avoid email enumeration
+    if (!user) {
+      return { message: 'If an account with that email exists, a reset link has been sent.' };
+    }
+
+    const resetToken = uuidv4();
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.em.flush();
+
+    try {
+      await this.emailService.sendPasswordResetEmail(user, resetToken);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${email}`, error.stack);
+    }
+
+    return { message: 'If an account with that email exists, a reset link has been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.em.findOne(User, {
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await this.em.flush();
+
+    return { message: 'Password has been reset successfully' };
+  }
+
   async createTutorInvitation(email: string) {
     const existingUser = await this.em.findOne(User, { email });
     if (existingUser) {

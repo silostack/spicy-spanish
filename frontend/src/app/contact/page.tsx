@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import MainLayout from '../components/MainLayout';
+import api from '../utils/api';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -23,10 +24,10 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setSubmitStatus('idle');
+
+    try {
+      await api.post('/contact', formData);
       setSubmitStatus('success');
       setFormData({
         name: '',
@@ -34,10 +35,16 @@ export default function Contact() {
         subject: '',
         message: ''
       });
-      
+
       // Reset status after 5 seconds
       setTimeout(() => setSubmitStatus('idle'), 5000);
-    }, 1000);
+    } catch (error) {
+      setSubmitStatus('error');
+      // Reset status after 5 seconds
+      setTimeout(() => setSubmitStatus('idle'), 5000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

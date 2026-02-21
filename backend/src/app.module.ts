@@ -10,6 +10,7 @@ import { CoursesModule } from './courses/courses.module';
 import { EmailModule } from './email/email.module';
 import { AdminModule } from './admin/admin.module';
 import { SeederModule } from './seeders/seeder.module';
+import { ContactModule } from './contact/contact.module';
 import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
 
 @Module({
@@ -43,6 +44,7 @@ import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
     EmailModule,
     AdminModule,
     SeederModule, // Add seeder module
+    ContactModule,
   ],
 })
 export class AppModule implements NestModule {

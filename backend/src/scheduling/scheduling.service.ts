@@ -8,6 +8,7 @@ import { ClassReport } from './entities/class-report.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 import { Course } from '../courses/entities/course.entity';
 import { EmailService } from '../email/email.service';
+import { GoogleCalendarService } from './google-calendar.service';
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
@@ -22,8 +23,6 @@ import {
 @Injectable()
 export class SchedulingService {
   private readonly logger = new Logger(SchedulingService.name);
-  // private calendar: calendar_v3.Calendar;
-  private readonly calendarId: string;
 
   constructor(
     @InjectRepository(Appointment)
@@ -40,22 +39,8 @@ export class SchedulingService {
     private readonly courseRepository: EntityRepository<Course>,
     private readonly em: EntityManager,
     private readonly emailService: EmailService,
-  ) {
-    // Initialize Google Calendar API
-    // const auth = new OAuth2Client(
-    //   process.env.GOOGLE_CLIENT_ID,
-    //   process.env.GOOGLE_CLIENT_SECRET,
-    //   process.env.GOOGLE_REDIRECT_URI
-    // );
-    
-    // // Set credentials from environment or configuration
-    // auth.setCredentials({
-    //   refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-    // });
-    
-    // this.calendar = google.calendar({ version: 'v3', auth });
-    this.calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
-  }
+    private readonly googleCalendar: GoogleCalendarService,
+  ) {}
 
   // Appointment methods
   async findAllAppointments() {
@@ -190,15 +175,15 @@ export class SchedulingService {
       appointment.notes = createAppointmentDto.notes;
     }
     
-    // Create Google Calendar event
-    const calendarEventId = await this.createGoogleCalendarEvent(
-      appointment.student.fullName,
-      appointment.tutor.fullName,
-      appointment.startTime,
-      appointment.endTime,
-      appointment.notes
-    );
-    
+    // Create Google Calendar event (non-blocking)
+    const calendarEventId = await this.googleCalendar.createEvent({
+      summary: `Spanish Class: ${student.fullName} with ${tutor.fullName}`,
+      description: appointment.notes,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      attendeeEmails: [student.email, tutor.email],
+    });
+
     if (calendarEventId) {
       appointment.googleCalendarEventId = calendarEventId;
     }
@@ -251,22 +236,18 @@ export class SchedulingService {
       
       // Update Google Calendar event if times are changing
       if (appointment.googleCalendarEventId) {
-        await this.updateGoogleCalendarEvent(
-          appointment.googleCalendarEventId,
-          appointment.student.fullName,
-          appointment.tutor.fullName,
+        await this.googleCalendar.updateEvent(appointment.googleCalendarEventId, {
+          summary: `Spanish Class: ${appointment.student.fullName} with ${appointment.tutor.fullName}`,
+          description: updateAppointmentDto.notes || appointment.notes,
           startTime,
           endTime,
-          updateAppointmentDto.notes || appointment.notes
-        );
+        });
       }
     }
-    
-    // Update status in Google Calendar if changing status
-    if (updateAppointmentDto.status && appointment.googleCalendarEventId) {
-      if (updateAppointmentDto.status === AppointmentStatus.CANCELLED) {
-        await this.cancelGoogleCalendarEvent(appointment.googleCalendarEventId);
-      }
+
+    // Cancel in Google Calendar if status is being set to cancelled
+    if (updateAppointmentDto.status === AppointmentStatus.CANCELLED && appointment.googleCalendarEventId) {
+      await this.googleCalendar.deleteEvent(appointment.googleCalendarEventId);
     }
     
     this.em.assign(appointment, updateAppointmentDto);
@@ -280,7 +261,7 @@ export class SchedulingService {
     
     // Cancel Google Calendar event
     if (appointment.googleCalendarEventId) {
-      await this.cancelGoogleCalendarEvent(appointment.googleCalendarEventId);
+      await this.googleCalendar.deleteEvent(appointment.googleCalendarEventId);
     }
     
     await this.em.flush();
@@ -302,15 +283,12 @@ export class SchedulingService {
     
     // Update Google Calendar event to mark as completed
     if (appointment.googleCalendarEventId) {
-      await this.updateGoogleCalendarEvent(
-        appointment.googleCalendarEventId,
-        appointment.student.fullName,
-        appointment.tutor.fullName,
-        appointment.startTime,
-        appointment.endTime,
-        appointment.notes,
-        true // marked as completed
-      );
+      await this.googleCalendar.updateEvent(appointment.googleCalendarEventId, {
+        summary: `Spanish Class: ${appointment.student.fullName} with ${appointment.tutor.fullName} (Completed)`,
+        description: appointment.notes,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+      });
     }
     
     await this.em.flush();
@@ -442,115 +420,6 @@ export class SchedulingService {
     
     const conflictingAppointments = await this.appointmentRepository.count(query);
     return conflictingAppointments > 0;
-  }
-
-  // Google Calendar integration methods
-  private async createGoogleCalendarEvent(
-    studentName: string,
-    tutorName: string,
-    startTime: Date,
-    endTime: Date,
-    notes?: string
-  ): Promise<string | null> {
-    try {
-      const event = {
-        summary: `Spanish Class: ${studentName} with ${tutorName}`,
-        description: notes || 'Spanish language lesson',
-        start: {
-          dateTime: startTime.toISOString(),
-          timeZone: 'UTC',
-        },
-        end: {
-          dateTime: endTime.toISOString(),
-          timeZone: 'UTC',
-        },
-        attendees: [
-          { email: `${studentName.replace(/\s+/g, '.')}@example.com`, displayName: studentName },
-          { email: `${tutorName.replace(/\s+/g, '.')}@example.com`, displayName: tutorName },
-        ],
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: 'email', minutes: 24 * 60 }, // 1 day before
-            { method: 'popup', minutes: 30 }, // 30 minutes before
-          ],
-        },
-      };
-
-      // const response = await this.calendar.events.insert({
-      //   calendarId: this.calendarId,
-      //   requestBody: event,
-      // });
-
-      // return response.data.id || null;
-      return null;
-    } catch (error) {
-      this.logger.error('Error creating Google Calendar event', error.stack);
-      return null;
-    }
-  }
-
-  private async updateGoogleCalendarEvent(
-    eventId: string,
-    studentName: string,
-    tutorName: string,
-    startTime: Date,
-    endTime: Date,
-    notes?: string,
-    completed: boolean = false
-  ): Promise<boolean> {
-    try {
-      // First get the existing event
-      // const existingEvent = await this.calendar.events.get({
-      //   calendarId: this.calendarId,
-      //   eventId: eventId,
-      // });
-
-      // Update the event
-      // const event = {
-      //   summary: `Spanish Class: ${studentName} with ${tutorName}${completed ? ' (Completed)' : ''}`,
-      //   description: notes || 'Spanish language lesson',
-      //   start: {
-      //     dateTime: startTime.toISOString(),
-      //     timeZone: 'UTC',
-      //   },
-      //   end: {
-      //     dateTime: endTime.toISOString(),
-      //     timeZone: 'UTC',
-      //   },
-      //   attendees: existingEvent.data.attendees,
-      //   reminders: existingEvent.data.reminders,
-      // };
-
-      // await this.calendar.events.update({
-      //   calendarId: this.calendarId,
-      //   eventId: eventId,
-      //   requestBody: event,
-      // });
-
-      return true;
-    } catch (error) {
-      this.logger.error('Error updating Google Calendar event', error.stack);
-      return false;
-    }
-  }
-
-  private async cancelGoogleCalendarEvent(eventId: string): Promise<boolean> {
-    try {
-      // Mark as cancelled in Google Calendar
-      // await this.calendar.events.update({
-      //   calendarId: this.calendarId,
-      //   eventId: eventId,
-      //   requestBody: {
-      //     status: 'cancelled',
-      //   },
-      // });
-
-      return true;
-    } catch (error) {
-      this.logger.error('Error cancelling Google Calendar event', error.stack);
-      return false;
-    }
   }
 
   // Dashboard stats

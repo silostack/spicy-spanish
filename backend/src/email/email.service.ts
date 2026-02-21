@@ -83,6 +83,34 @@ export class EmailService {
     });
   }
 
+  async sendPasswordResetEmail(user: User, resetToken: string): Promise<void> {
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:8008';
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    const template = `
+      <h1>Password Reset Request</h1>
+      <p>Hello {{name}},</p>
+      <p>We received a request to reset your password for your Spicy Spanish account.</p>
+      <p>Click the link below to set a new password:</p>
+      <p><a href="{{resetLink}}" style="display:inline-block;padding:12px 24px;background-color:#E53E3E;color:white;text-decoration:none;border-radius:8px;">Reset Password</a></p>
+      <p>This link will expire in 1 hour.</p>
+      <p>If you did not request a password reset, you can safely ignore this email.</p>
+    `;
+
+    const compiledTemplate = handlebars.compile(template);
+    const html = compiledTemplate({
+      name: user.firstName,
+      resetLink,
+    });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: user.email,
+      subject: 'Password Reset - Spicy Spanish',
+      html,
+    });
+  }
+
   async sendClassReminder(appointment: Appointment): Promise<void> {
     const student = appointment.student;
     const tutor = appointment.tutor;
@@ -377,6 +405,33 @@ export class EmailService {
     }
   }
   
+  async sendContactEmail(name: string, email: string, subject: string, message: string): Promise<void> {
+    const template = `
+      <h1>New Contact Form Submission</h1>
+      <p>A visitor has submitted the contact form on Spicy Spanish:</p>
+      <ul>
+        <li><strong>Name:</strong> {{name}}</li>
+        <li><strong>Email:</strong> {{email}}</li>
+        <li><strong>Subject:</strong> {{subject}}</li>
+      </ul>
+      <h2>Message:</h2>
+      <p>{{message}}</p>
+      <hr />
+      <p><em>You can reply directly to this email to respond to the sender.</em></p>
+    `;
+
+    const compiledTemplate = handlebars.compile(template);
+    const html = compiledTemplate({ name, email, subject, message });
+
+    await this.transporter.sendMail({
+      from: this.configService.get('EMAIL_FROM'),
+      to: this.configService.get('ADMIN_EMAIL'),
+      replyTo: email,
+      subject: `Contact Form: ${subject} - Spicy Spanish`,
+      html,
+    });
+  }
+
   async sendDayBeforeReminder(appointment: Appointment): Promise<void> {
     const student = appointment.student;
     const tutor = appointment.tutor;
