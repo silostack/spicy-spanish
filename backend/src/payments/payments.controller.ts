@@ -132,6 +132,13 @@ export class PaymentsController {
     return this.paymentsService.completeManualPayment(transactionId);
   }
 
+  // Student balance
+  @Get('balance/:studentId')
+  @UseGuards(JwtAuthGuard)
+  getStudentBalance(@Param('studentId') studentId: string) {
+    return this.paymentsService.getStudentBalance(studentId);
+  }
+
   // Stats
   @Get('stats')
   @UseGuards(JwtAuthGuard, RolesGuard)

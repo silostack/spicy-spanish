@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '../../utils/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Package {
   id: string;
@@ -15,61 +16,52 @@ interface Package {
 
 interface Transaction {
   id: string;
-  studentId: string;
   studentName: string;
-  packageId: string;
   packageName: string;
   amount: number;
-  status: 'completed' | 'pending' | 'failed';
+  hours: number;
+  status: 'completed' | 'pending' | 'failed' | 'refunded';
   createdAt: string;
   paymentMethod: string;
 }
 
 export default function PaymentsPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('packages');
   const [packages, setPackages] = useState<Package[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<{ role: string } | null>(null);
-  const [userLoaded, setUserLoaded] = useState(false);
   const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Student balance
+  const [balance, setBalance] = useState<{ totalHoursPurchased: number; hoursUsed: number; availableHours: number } | null>(null);
 
   // Checkout modal state
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
 
-  // Load user data first
+  // Fetch data after auth is ready
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        } catch (e) {
-          // Invalid user data in localStorage
-        }
-      }
-      setUserLoaded(true);
-    }
-  }, []);
+    if (authLoading) return;
 
-  // Fetch data after user is loaded
-  useEffect(() => {
-    if (!userLoaded) return;
-    
     if (activeTab === 'packages') {
       fetchPackages();
     } else {
       fetchTransactions();
     }
-  }, [activeTab, currentPage, userLoaded]);
+  }, [activeTab, authLoading]);
+
+  // Fetch student balance
+  useEffect(() => {
+    if (authLoading || !user || user.role !== 'student') return;
+
+    api.get(`/payments/balance/${user.id}`)
+      .then(res => setBalance(res.data))
+      .catch(() => { /* Balance fetch is non-critical */ });
+  }, [authLoading, user]);
 
   const fetchPackages = async () => {
     try {
@@ -89,65 +81,43 @@ export default function PaymentsPage() {
       setPackages(mappedPackages);
       setLoading(false);
     } catch (error) {
-      // Fallback to default packages matching the seeder
-      setPackages([
-        {
-          id: '1',
-          name: 'Starter Package',
-          description: 'Perfect for beginners wanting to try out our Spanish lessons.',
-          hours: 4,
-          price: 49,
-          isActive: true
-        },
-        {
-          id: '2',
-          name: 'Popular Package',
-          description: 'Our most popular package for consistent learning.',
-          hours: 8,
-          price: 89,
-          isActive: true
-        },
-        {
-          id: '3',
-          name: 'Intensive Package',
-          description: 'For serious learners who want to progress quickly.',
-          hours: 16,
-          price: 159,
-          isActive: true
-        },
-        {
-          id: '4',
-          name: 'Premium Package',
-          description: 'Maximum flexibility and value for dedicated students.',
-          hours: 32,
-          price: 299,
-          isActive: true
-        }
-      ]);
+      setError('Failed to load packages');
+      setPackages([]);
       setLoading(false);
-      setError(null);
     }
   };
 
   const fetchTransactions = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
-      const response = await api.get('/payments/transactions', {
-        params: {
-          page: currentPage,
-          limit: 10,
-        },
-      });
-      
-      setTransactions(response.data.items);
-      setTotalPages(Math.ceil(response.data.total / 10));
+      // Use different endpoints for admin vs student
+      const endpoint = user.role === 'admin'
+        ? '/payments/transactions'
+        : `/payments/transactions/student/${user.id}`;
+
+      const response = await api.get(endpoint);
+
+      // Map backend format (populated relations) to frontend format
+      const mapped: Transaction[] = (response.data || []).map((t: any) => ({
+        id: t.id,
+        studentName: t.student
+          ? `${t.student.firstName} ${t.student.lastName}`
+          : 'Unknown',
+        packageName: t.package?.name || 'Custom',
+        amount: t.amountUsd,
+        hours: t.hours,
+        status: t.status,
+        createdAt: t.createdAt,
+        paymentMethod: t.paymentMethod,
+      }));
+
+      setTransactions(mapped);
       setLoading(false);
     } catch (error) {
       setError('Failed to load transactions');
-      setLoading(false);
-
       setTransactions([]);
-      setTotalPages(1);
       setLoading(false);
     }
   };
@@ -177,16 +147,32 @@ export default function PaymentsPage() {
     setCheckoutModalOpen(true);
   };
 
-  const handleCheckout = () => {
-    // TODO: Wire to Stripe checkout (Phase 2)
-    alert(`Payment processed for ${selectedPackage?.name}`);
-    setCheckoutModalOpen(false);
-    setSelectedPackage(null);
+  const handleCheckout = async () => {
+    if (!selectedPackage || !user) return;
 
-    if (activeTab !== 'transactions') {
-      setActiveTab('transactions');
-    } else {
-      fetchTransactions();
+    try {
+      setCheckoutLoading(true);
+      setError(null);
+
+      const response = await api.post('/payments/stripe/checkout', {
+        packageId: selectedPackage.id,
+        studentId: user.id,
+        successUrl: `${window.location.origin}/dashboard/payments/success`,
+        cancelUrl: `${window.location.origin}/dashboard/payments/cancel`,
+      });
+
+      const { sessionUrl } = response.data;
+
+      if (sessionUrl) {
+        // Redirect to Stripe Checkout
+        window.location.href = sessionUrl;
+      } else {
+        setError('Failed to create checkout session');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to initiate payment');
+    } finally {
+      setCheckoutLoading(false);
     }
   };
 
@@ -217,6 +203,16 @@ export default function PaymentsPage() {
     }
   };
 
+  const handleCompletePayment = async (transactionId: string) => {
+    try {
+      await api.post(`/payments/transactions/${transactionId}/complete`);
+      // Refresh transactions
+      fetchTransactions();
+    } catch (error) {
+      alert('Failed to mark payment as completed');
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -232,7 +228,7 @@ export default function PaymentsPage() {
   };
 
   // Show loading spinner while user data is being loaded
-  if (!userLoaded || (loading && ((activeTab === 'packages' && packages.length === 0) || (activeTab === 'transactions' && transactions.length === 0)))) {
+  if (authLoading || (loading && ((activeTab === 'packages' && packages.length === 0) || (activeTab === 'transactions' && transactions.length === 0)))) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
@@ -271,6 +267,13 @@ export default function PaymentsPage() {
           </Link>
         )}
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
@@ -396,7 +399,23 @@ export default function PaymentsPage() {
               </div>
             </div>
           ) : (
-            // Student view - Cards
+            // Student view
+            <div>
+            {/* Hour Balance Card */}
+            {balance && (
+              <div className="mb-6 bg-gradient-to-r from-spicy-dark to-gray-800 rounded-xl p-6 text-white">
+                <h3 className="text-sm font-medium text-gray-300 mb-1">Your Hour Balance</h3>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold">{balance.availableHours}</span>
+                  <span className="text-gray-300">hours remaining</span>
+                </div>
+                <div className="mt-3 flex gap-6 text-sm text-gray-400">
+                  <span>{balance.totalHoursPurchased} purchased</span>
+                  <span>{balance.hoursUsed} used</span>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               {packages
                 .filter(pkg => pkg.isActive)
@@ -426,6 +445,7 @@ export default function PaymentsPage() {
                     </div>
                   </div>
                 ))}
+            </div>
             </div>
           )}
         </div>
@@ -497,9 +517,14 @@ export default function PaymentsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <button className="text-spicy-red hover:text-spicy-orange">
-                            Download
-                          </button>
+                          {user?.role === 'admin' && transaction.status === 'pending' && (
+                            <button
+                              className="text-green-600 hover:text-green-800 font-medium mr-3"
+                              onClick={() => handleCompletePayment(transaction.id)}
+                            >
+                              Mark Complete
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -515,38 +540,6 @@ export default function PaymentsPage() {
             </div>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center">
-              <nav className="inline-flex rounded-md shadow">
-                <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
-                    currentPage === 1
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Previous
-                </button>
-                <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className={`relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
-                    currentPage === totalPages
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  Next
-                </button>
-              </nav>
-            </div>
-          )}
         </div>
       )}
 
@@ -684,10 +677,11 @@ export default function PaymentsPage() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-spicy-red text-white rounded-md hover:bg-opacity-90"
+                className="px-4 py-2 bg-spicy-red text-white rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleCheckout}
+                disabled={checkoutLoading}
               >
-                Pay with Card
+                {checkoutLoading ? 'Redirecting...' : 'Pay with Card'}
               </button>
             </div>
           </div>

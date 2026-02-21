@@ -4,6 +4,7 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { Package } from './entities/package.entity';
 import { Transaction, TransactionStatus, PaymentMethod } from './entities/transaction.entity';
 import { User, UserRole } from '../users/entities/user.entity';
+import { Appointment, AppointmentStatus } from '../scheduling/entities/appointment.entity';
 import Stripe from 'stripe';
 import { CreatePackageDto, UpdatePackageDto, CreateTransactionDto, StripeCheckoutDto } from './dto';
 
@@ -391,6 +392,48 @@ export class PaymentsService {
 
     await this.em.flush();
     return transaction;
+  }
+
+  // Student hour balance
+  async getStudentBalance(studentId: string) {
+    const student = await this.userRepository.findOne({
+      id: studentId,
+      role: UserRole.STUDENT,
+    });
+
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${studentId} not found`);
+    }
+
+    // Hours purchased from completed transactions
+    const completedTransactions = await this.transactionRepository.find({
+      student: studentId,
+      status: TransactionStatus.COMPLETED,
+    });
+
+    const totalHoursPurchased = completedTransactions.reduce(
+      (total, t) => total + t.hours,
+      0,
+    );
+
+    // Hours used from completed appointments
+    const completedAppointments = await this.em.find(Appointment, {
+      student: studentId,
+      status: AppointmentStatus.COMPLETED,
+    });
+
+    const hoursUsed = completedAppointments.reduce((total, a) => {
+      const durationMs =
+        new Date(a.endTime).getTime() - new Date(a.startTime).getTime();
+      return total + durationMs / (1000 * 60 * 60);
+    }, 0);
+
+    return {
+      totalHoursPurchased,
+      hoursUsed: Math.round(hoursUsed * 100) / 100,
+      availableHours:
+        Math.round((totalHoursPurchased - hoursUsed) * 100) / 100,
+    };
   }
 
   // Dashboard statistics
