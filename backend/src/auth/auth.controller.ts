@@ -4,6 +4,7 @@ import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterStudentDto } from './dto/register-student.dto';
 import { RegisterTutorDto } from './dto/register-tutor.dto';
+import { RegisterTutorDirectDto } from './dto/register-tutor-direct.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -66,6 +67,13 @@ export class AuthController {
   @Post('invite/tutor')
   async inviteTutor(@Body() { email }: { email: string }) {
     return this.authService.createTutorInvitation(email);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post('register/tutor/direct')
+  async registerTutorDirect(@Body() dto: RegisterTutorDirectDto) {
+    return this.authService.registerTutorDirect(dto);
   }
 
   @UseGuards(JwtAuthGuard)
