@@ -1,4 +1,5 @@
 # Project exclude paths
+.worktrees/
 /backend/.env
 /frontend/.env.local
 
