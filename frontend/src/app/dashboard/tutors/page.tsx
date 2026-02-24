@@ -158,7 +158,7 @@ export default function TutorsPage() {
         <div className="flex gap-2">
           <Link
             href="/dashboard/tutors/invite"
-            className="btn-primary bg-white border border-spicy-red text-spicy-red hover:bg-red-50 font-bold py-2 px-4 rounded-lg flex items-center"
+            className="bg-white border border-spicy-red text-spicy-red hover:bg-red-50 font-bold py-2 px-4 rounded-lg flex items-center transition-all"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -173,7 +173,7 @@ export default function TutorsPage() {
           </Link>
           <Link
             href="/dashboard/tutors/new"
-            className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
+            className="btn-primary hover:bg-spicy-orange rounded-lg flex items-center"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
