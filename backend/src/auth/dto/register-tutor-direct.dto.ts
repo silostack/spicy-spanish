@@ -1,4 +1,3 @@
-// backend/src/auth/dto/register-tutor-direct.dto.ts
 import { IsEmail, IsNotEmpty, IsString, IsOptional, MinLength, IsPhoneNumber } from 'class-validator';
 
 export class RegisterTutorDirectDto {

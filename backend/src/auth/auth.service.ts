@@ -175,6 +175,7 @@ export class AuthService {
 
     return { message: 'Invitation sent successfully' };
   }
+
   async registerTutorDirect(dto: RegisterTutorDirectDto) {
     const existingUser = await this.em.findOne(User, { email: dto.email });
     if (existingUser) {
