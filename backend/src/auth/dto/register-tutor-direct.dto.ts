@@ -1,5 +1,5 @@
 // backend/src/auth/dto/register-tutor-direct.dto.ts
-import { IsEmail, IsNotEmpty, IsString, IsOptional, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsOptional, MinLength, IsPhoneNumber } from 'class-validator';
 
 export class RegisterTutorDirectDto {
   @IsString()
@@ -23,7 +23,7 @@ export class RegisterTutorDirectDto {
   @IsOptional()
   timezone?: string;
 
-  @IsString()
+  @IsPhoneNumber()
   @IsOptional()
   phoneNumber?: string;
 }
