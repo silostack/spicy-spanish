@@ -8,6 +8,7 @@ import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterStudentDto } from './dto/register-student.dto';
 import { RegisterTutorDto } from './dto/register-tutor.dto';
+import { RegisterTutorDirectDto } from './dto/register-tutor-direct.dto';
 
 @Injectable()
 export class AuthService {
@@ -174,4 +175,30 @@ export class AuthService {
 
     return { message: 'Invitation sent successfully' };
   }
+
+  async registerTutorDirect(dto: RegisterTutorDirectDto) {
+    const existingUser = await this.em.findOne(User, { email: dto.email });
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const user = new User(
+      dto.firstName,
+      dto.lastName,
+      dto.email,
+      hashedPassword,
+      UserRole.TUTOR,
+    );
+
+    user.timezone = dto.timezone;
+    user.phoneNumber = dto.phoneNumber;
+    user.isActive = true;
+
+    await this.em.persistAndFlush(user);
+
+    const { password: _, ...result } = user;
+    return result;
+  }
+
 }
