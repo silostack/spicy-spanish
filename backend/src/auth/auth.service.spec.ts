@@ -5,6 +5,7 @@ import { EntityManager } from '@mikro-orm/core';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { User, UserRole } from '../users/entities/user.entity';
+import { RegisterTutorDirectDto } from './dto/register-tutor-direct.dto';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt', () => ({
@@ -372,6 +373,65 @@ describe('AuthService', () => {
 
       expect(result.message).toContain('Invitation sent');
       expect(em.persistAndFlush).toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // registerTutorDirect
+  // ---------------------------------------------------------------------------
+  describe('registerTutorDirect', () => {
+    const dto: RegisterTutorDirectDto = {
+      firstName: 'Maria',
+      lastName: 'Lopez',
+      email: 'maria@example.com',
+      password: 'tutorpass123',
+      timezone: 'Europe/Madrid',
+      phoneNumber: '+34600000000',
+    };
+
+    it('should create a tutor account and return user without password', async () => {
+      em.findOne.mockResolvedValue(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-tutor-pass');
+
+      const result = await service.registerTutorDirect(dto);
+
+      expect(em.findOne).toHaveBeenCalledWith(User, { email: 'maria@example.com' });
+      expect(bcrypt.hash).toHaveBeenCalledWith('tutorpass123', 10);
+      expect(em.persistAndFlush).toHaveBeenCalled();
+      expect(result.email).toBe('maria@example.com');
+      expect(result.firstName).toBe('Maria');
+      expect(result.lastName).toBe('Lopez');
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it('should set role to TUTOR, isActive true, no invitationToken', async () => {
+      em.findOne.mockResolvedValue(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+
+      await service.registerTutorDirect(dto);
+
+      const persistedUser = (em.persistAndFlush as jest.Mock).mock.calls[0][0] as User;
+      expect(persistedUser.role).toBe(UserRole.TUTOR);
+      expect(persistedUser.isActive).toBe(true);
+      expect(persistedUser.invitationToken).toBeUndefined();
+    });
+
+    it('should set timezone and phoneNumber on the new user', async () => {
+      em.findOne.mockResolvedValue(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+
+      await service.registerTutorDirect(dto);
+
+      const persistedUser = (em.persistAndFlush as jest.Mock).mock.calls[0][0] as User;
+      expect(persistedUser.timezone).toBe('Europe/Madrid');
+      expect(persistedUser.phoneNumber).toBe('+34600000000');
+    });
+
+    it('should throw ConflictException if email already in use', async () => {
+      em.findOne.mockResolvedValue(mockUser());
+
+      await expect(service.registerTutorDirect(dto)).rejects.toThrow(ConflictException);
+      expect(em.persistAndFlush).not.toHaveBeenCalled();
     });
   });
 });
