@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { EntityManager } from '@mikro-orm/core';
-import { seedPackages } from './package.seeder';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { EntityManager } from "@mikro-orm/core";
+import { seedPackages } from "./package.seeder";
 
 @Injectable()
 export class SeederService implements OnModuleInit {
@@ -9,7 +9,7 @@ export class SeederService implements OnModuleInit {
   constructor(private readonly em: EntityManager) {}
 
   async onModuleInit() {
-    this.logger.log('Running database seeders...');
+    this.logger.log("Running database seeders...");
 
     try {
       // Create a fork to avoid conflicts with the main entity manager
@@ -22,9 +22,9 @@ export class SeederService implements OnModuleInit {
       // await seedCourses(fork);
       // await seedUsers(fork);
 
-      this.logger.log('All seeders completed successfully');
+      this.logger.log("All seeders completed successfully");
     } catch (error) {
-      this.logger.error('Error running seeders', error.stack);
+      this.logger.error("Error running seeders", error.stack);
     }
   }
 }

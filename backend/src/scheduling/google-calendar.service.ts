@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { google, calendar_v3 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import { Injectable, Logger } from "@nestjs/common";
+import { google, calendar_v3 } from "googleapis";
+import { OAuth2Client } from "google-auth-library";
 
 interface CalendarEventParams {
   summary: string;
@@ -17,7 +17,7 @@ export class GoogleCalendarService {
   private readonly calendarId: string;
 
   constructor() {
-    this.calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+    this.calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -26,11 +26,11 @@ export class GoogleCalendarService {
     if (clientId && clientSecret && refreshToken) {
       const auth = new OAuth2Client(clientId, clientSecret);
       auth.setCredentials({ refresh_token: refreshToken });
-      this.calendar = google.calendar({ version: 'v3', auth });
-      this.logger.log('Google Calendar API initialized');
+      this.calendar = google.calendar({ version: "v3", auth });
+      this.logger.log("Google Calendar API initialized");
     } else {
       this.logger.warn(
-        'Google Calendar credentials not configured — calendar sync disabled',
+        "Google Calendar credentials not configured — calendar sync disabled",
       );
     }
   }
@@ -45,20 +45,20 @@ export class GoogleCalendarService {
     try {
       const event: calendar_v3.Schema$Event = {
         summary: params.summary,
-        description: params.description || 'Spanish language lesson',
+        description: params.description || "Spanish language lesson",
         start: {
           dateTime: params.startTime.toISOString(),
-          timeZone: 'UTC',
+          timeZone: "UTC",
         },
         end: {
           dateTime: params.endTime.toISOString(),
-          timeZone: 'UTC',
+          timeZone: "UTC",
         },
         reminders: {
           useDefault: false,
           overrides: [
-            { method: 'email', minutes: 24 * 60 },
-            { method: 'popup', minutes: 30 },
+            { method: "email", minutes: 24 * 60 },
+            { method: "popup", minutes: 30 },
           ],
         },
       };
@@ -75,7 +75,7 @@ export class GoogleCalendarService {
       this.logger.log(`Created calendar event: ${response.data.id}`);
       return response.data.id || null;
     } catch (error) {
-      this.logger.error('Failed to create Google Calendar event', error.stack);
+      this.logger.error("Failed to create Google Calendar event", error.stack);
       return null;
     }
   }
@@ -89,14 +89,14 @@ export class GoogleCalendarService {
     try {
       const event: calendar_v3.Schema$Event = {
         summary: params.summary,
-        description: params.description || 'Spanish language lesson',
+        description: params.description || "Spanish language lesson",
         start: {
           dateTime: params.startTime.toISOString(),
-          timeZone: 'UTC',
+          timeZone: "UTC",
         },
         end: {
           dateTime: params.endTime.toISOString(),
-          timeZone: 'UTC',
+          timeZone: "UTC",
         },
       };
 
@@ -109,7 +109,7 @@ export class GoogleCalendarService {
       this.logger.log(`Updated calendar event: ${eventId}`);
       return true;
     } catch (error) {
-      this.logger.error('Failed to update Google Calendar event', error.stack);
+      this.logger.error("Failed to update Google Calendar event", error.stack);
       return false;
     }
   }
@@ -126,7 +126,7 @@ export class GoogleCalendarService {
       this.logger.log(`Deleted calendar event: ${eventId}`);
       return true;
     } catch (error) {
-      this.logger.error('Failed to delete Google Calendar event', error.stack);
+      this.logger.error("Failed to delete Google Calendar event", error.stack);
       return false;
     }
   }

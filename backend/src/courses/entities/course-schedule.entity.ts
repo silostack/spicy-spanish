@@ -1,6 +1,6 @@
-import { Entity, ManyToOne, PrimaryKey, Property } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { Course } from './course.entity';
+import { Entity, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { Course } from "./course.entity";
 
 @Entity()
 export class CourseSchedule {
@@ -25,7 +25,12 @@ export class CourseSchedule {
   @Property({ onUpdate: () => new Date() })
   updatedAt: Date = new Date();
 
-  constructor(course: Course, dayOfWeek: number, startTime: string, endTime: string) {
+  constructor(
+    course: Course,
+    dayOfWeek: number,
+    startTime: string,
+    endTime: string,
+  ) {
     this.course = course;
     this.dayOfWeek = dayOfWeek;
     this.startTime = startTime;

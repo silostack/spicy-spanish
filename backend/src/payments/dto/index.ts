@@ -1,5 +1,16 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsUUID, IsNumber, Min } from 'class-validator';
-import { PaymentMethod, TransactionStatus } from '../entities/transaction.entity';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  IsNumber,
+  Min,
+} from "class-validator";
+import {
+  PaymentMethod,
+  TransactionStatus,
+} from "../entities/transaction.entity";
 
 export class CreatePackageDto {
   @IsString()

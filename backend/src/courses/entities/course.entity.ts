@@ -1,7 +1,15 @@
-import { Entity, ManyToOne, ManyToMany, PrimaryKey, Property, Collection, OneToMany } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { User } from '../../users/entities/user.entity';
-import { CourseSchedule } from './course-schedule.entity';
+import {
+  Entity,
+  ManyToOne,
+  ManyToMany,
+  PrimaryKey,
+  Property,
+  Collection,
+  OneToMany,
+} from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { User } from "../../users/entities/user.entity";
+import { CourseSchedule } from "./course-schedule.entity";
 
 @Entity()
 export class Course {
@@ -23,13 +31,15 @@ export class Course {
   @Property({ default: true })
   isActive: boolean = true;
 
-  @Property({ type: 'decimal', precision: 6, scale: 2, default: 0 })
+  @Property({ type: "decimal", precision: 6, scale: 2, default: 0 })
   hoursBalance: number = 0;
 
   @Property({ default: false })
   needsRenewal: boolean = false;
 
-  @OneToMany(() => CourseSchedule, schedule => schedule.course, { orphanRemoval: true })
+  @OneToMany(() => CourseSchedule, (schedule) => schedule.course, {
+    orphanRemoval: true,
+  })
   schedules = new Collection<CourseSchedule>(this);
 
   @Property()

@@ -1,6 +1,13 @@
-import { Controller, Post, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
-import { EmailService } from '../email/email.service';
+import {
+  Controller,
+  Post,
+  Body,
+  Logger,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
+import { IsEmail, IsNotEmpty, IsString } from "class-validator";
+import { EmailService } from "../email/email.service";
 
 class ContactDto {
   @IsNotEmpty()
@@ -20,7 +27,7 @@ class ContactDto {
   message: string;
 }
 
-@Controller('contact')
+@Controller("contact")
 export class ContactController {
   private readonly logger = new Logger(ContactController.name);
 
@@ -44,6 +51,9 @@ export class ContactController {
       // The message was received even if email delivery had issues
     }
 
-    return { message: 'Your message has been received. We will get back to you within 24 hours.' };
+    return {
+      message:
+        "Your message has been received. We will get back to you within 24 hours.",
+    };
   }
 }

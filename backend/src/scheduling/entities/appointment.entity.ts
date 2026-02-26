@@ -1,13 +1,21 @@
-import { Entity, ManyToOne, ManyToMany, PrimaryKey, Property, Enum, Collection } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { User } from '../../users/entities/user.entity';
-import { Course } from '../../courses/entities/course.entity';
+import {
+  Entity,
+  ManyToOne,
+  ManyToMany,
+  PrimaryKey,
+  Property,
+  Enum,
+  Collection,
+} from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { User } from "../../users/entities/user.entity";
+import { Course } from "../../courses/entities/course.entity";
 
 export enum AppointmentStatus {
-  SCHEDULED = 'scheduled',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  NO_SHOW = 'no_show',
+  SCHEDULED = "scheduled",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
+  NO_SHOW = "no_show",
 }
 
 @Entity()

@@ -1,12 +1,12 @@
-import { Entity, ManyToOne, PrimaryKey, Property, Enum } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { Appointment } from './appointment.entity';
-import { User } from '../../users/entities/user.entity';
+import { Entity, ManyToOne, PrimaryKey, Property, Enum } from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { Appointment } from "./appointment.entity";
+import { User } from "../../users/entities/user.entity";
 
 export enum AttendanceStatus {
-  PRESENT = 'present',
-  ABSENT = 'absent',
-  ON_TIME_CANCELLATION = 'on_time_cancellation',
+  PRESENT = "present",
+  ABSENT = "absent",
+  ON_TIME_CANCELLATION = "on_time_cancellation",
 }
 
 @Entity()

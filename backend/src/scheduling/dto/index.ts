@@ -1,6 +1,19 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsUUID, IsNumber, IsDateString, Min, Max, Matches, IsArray, ArrayMinSize } from 'class-validator';
-import { AppointmentStatus } from '../entities/appointment.entity';
-import { AttendanceStatus } from '../entities/attendance.entity';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  IsNumber,
+  IsDateString,
+  Min,
+  Max,
+  Matches,
+  IsArray,
+  ArrayMinSize,
+} from "class-validator";
+import { AppointmentStatus } from "../entities/appointment.entity";
+import { AttendanceStatus } from "../entities/attendance.entity";
 
 export class CreateAppointmentDto {
   @IsArray()
@@ -57,10 +70,10 @@ export class CreateAvailabilityDto {
   @Max(6)
   dayOfWeek: number;
 
-  @Matches(/^\d{2}:\d{2}$/, { message: 'startTime must be in HH:MM format' })
+  @Matches(/^\d{2}:\d{2}$/, { message: "startTime must be in HH:MM format" })
   startTime: string;
 
-  @Matches(/^\d{2}:\d{2}$/, { message: 'endTime must be in HH:MM format' })
+  @Matches(/^\d{2}:\d{2}$/, { message: "endTime must be in HH:MM format" })
   endTime: string;
 
   @IsOptional()
@@ -80,11 +93,11 @@ export class UpdateAvailabilityDto {
   dayOfWeek?: number;
 
   @IsOptional()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'startTime must be in HH:MM format' })
+  @Matches(/^\d{2}:\d{2}$/, { message: "startTime must be in HH:MM format" })
   startTime?: string;
 
   @IsOptional()
-  @Matches(/^\d{2}:\d{2}$/, { message: 'endTime must be in HH:MM format' })
+  @Matches(/^\d{2}:\d{2}$/, { message: "endTime must be in HH:MM format" })
   endTime?: string;
 
   @IsOptional()

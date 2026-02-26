@@ -1,21 +1,21 @@
-import { Entity, ManyToOne, PrimaryKey, Property, Enum } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { User } from '../../users/entities/user.entity';
-import { Package } from './package.entity';
+import { Entity, ManyToOne, PrimaryKey, Property, Enum } from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { User } from "../../users/entities/user.entity";
+import { Package } from "./package.entity";
 
 export enum PaymentMethod {
-  CREDIT_CARD = 'credit_card',
-  CRYPTO = 'crypto',
-  ZELLE = 'zelle',
-  PAYPAL = 'paypal',
-  MANUAL = 'manual',
+  CREDIT_CARD = "credit_card",
+  CRYPTO = "crypto",
+  ZELLE = "zelle",
+  PAYPAL = "paypal",
+  MANUAL = "manual",
 }
 
 export enum TransactionStatus {
-  PENDING = 'pending',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  REFUNDED = 'refunded',
+  PENDING = "pending",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  REFUNDED = "refunded",
 }
 
 @Entity()

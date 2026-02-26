@@ -1,43 +1,50 @@
-import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { SchedulingModule } from './scheduling/scheduling.module';
-import { PaymentsModule } from './payments/payments.module';
-import { CoursesModule } from './courses/courses.module';
-import { EmailModule } from './email/email.module';
-import { AdminModule } from './admin/admin.module';
-import { SeederModule } from './seeders/seeder.module';
-import { ContactModule } from './contact/contact.module';
-import { HealthModule } from './health/health.module';
-import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
+import {
+  Module,
+  NestModule,
+  MiddlewareConsumer,
+  RequestMethod,
+} from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { MikroOrmModule } from "@mikro-orm/nestjs";
+import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { AuthModule } from "./auth/auth.module";
+import { UsersModule } from "./users/users.module";
+import { SchedulingModule } from "./scheduling/scheduling.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { CoursesModule } from "./courses/courses.module";
+import { EmailModule } from "./email/email.module";
+import { AdminModule } from "./admin/admin.module";
+import { SeederModule } from "./seeders/seeder.module";
+import { ContactModule } from "./contact/contact.module";
+import { HealthModule } from "./health/health.module";
+import { RawBodyMiddleware } from "./common/middleware/raw-body.middleware";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     MikroOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        dbName: configService.get('MIKRO_ORM_DB_NAME'),
-        user: configService.get('MIKRO_ORM_USER'),
-        password: configService.get('MIKRO_ORM_PASSWORD'),
-        host: configService.get('MIKRO_ORM_HOST'),
-        port: configService.get('MIKRO_ORM_PORT'),
-        type: 'postgresql',
+        dbName: configService.get("MIKRO_ORM_DB_NAME"),
+        user: configService.get("MIKRO_ORM_USER"),
+        password: configService.get("MIKRO_ORM_PASSWORD"),
+        host: configService.get("MIKRO_ORM_HOST"),
+        port: configService.get("MIKRO_ORM_PORT"),
+        type: "postgresql",
         autoLoadEntities: true,
         migrations: {
-          path: './dist/migrations',
-          pathTs: './src/migrations',
+          path: "./dist/migrations",
+          pathTs: "./src/migrations",
         },
       }),
     }),
@@ -57,8 +64,9 @@ import { RawBodyMiddleware } from './common/middleware/raw-body.middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Apply raw body middleware for Stripe webhooks
-    consumer
-      .apply(RawBodyMiddleware)
-      .forRoutes({ path: 'api/payments/stripe/webhook', method: RequestMethod.POST });
+    consumer.apply(RawBodyMiddleware).forRoutes({
+      path: "api/payments/stripe/webhook",
+      method: RequestMethod.POST,
+    });
   }
 }

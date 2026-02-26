@@ -1,14 +1,20 @@
-import { Injectable, UnauthorizedException, ConflictException, NotFoundException, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
-import { EntityManager } from '@mikro-orm/core';
-import { User, UserRole } from '../users/entities/user.entity';
-import { EmailService } from '../email/email.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterStudentDto } from './dto/register-student.dto';
-import { RegisterTutorDto } from './dto/register-tutor.dto';
-import { RegisterTutorDirectDto } from './dto/register-tutor-direct.dto';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
+import { v4 as uuidv4 } from "uuid";
+import { EntityManager } from "@mikro-orm/core";
+import { User, UserRole } from "../users/entities/user.entity";
+import { EmailService } from "../email/email.service";
+import { LoginDto } from "./dto/login.dto";
+import { RegisterStudentDto } from "./dto/register-student.dto";
+import { RegisterTutorDto } from "./dto/register-tutor.dto";
+import { RegisterTutorDirectDto } from "./dto/register-tutor-direct.dto";
 
 @Injectable()
 export class AuthService {
@@ -38,7 +44,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException("Invalid credentials");
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
@@ -55,9 +61,11 @@ export class AuthService {
   }
 
   async registerStudent(registerDto: RegisterStudentDto) {
-    const existingUser = await this.em.findOne(User, { email: registerDto.email });
+    const existingUser = await this.em.findOne(User, {
+      email: registerDto.email,
+    });
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException("Email already exists");
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -78,7 +86,10 @@ export class AuthService {
     try {
       await this.emailService.sendNewStudentRegistrationEmail(user);
     } catch (error) {
-      this.logger.error(`Failed to send registration email to ${user.email}`, error.stack);
+      this.logger.error(
+        `Failed to send registration email to ${user.email}`,
+        error.stack,
+      );
     }
 
     const { password: _, ...result } = user;
@@ -86,9 +97,11 @@ export class AuthService {
   }
 
   async registerTutor(registerDto: RegisterTutorDto) {
-    const user = await this.em.findOne(User, { invitationToken: registerDto.token });
+    const user = await this.em.findOne(User, {
+      invitationToken: registerDto.token,
+    });
     if (!user || user.role !== UserRole.TUTOR) {
-      throw new NotFoundException('Invalid invitation token');
+      throw new NotFoundException("Invalid invitation token");
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -111,7 +124,10 @@ export class AuthService {
 
     // Always return success to avoid email enumeration
     if (!user) {
-      return { message: 'If an account with that email exists, a reset link has been sent.' };
+      return {
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      };
     }
 
     const resetToken = uuidv4();
@@ -123,10 +139,16 @@ export class AuthService {
     try {
       await this.emailService.sendPasswordResetEmail(user, resetToken);
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error.stack);
+      this.logger.error(
+        `Failed to send password reset email to ${email}`,
+        error.stack,
+      );
     }
 
-    return { message: 'If an account with that email exists, a reset link has been sent.' };
+    return {
+      message:
+        "If an account with that email exists, a reset link has been sent.",
+    };
   }
 
   async resetPassword(token: string, newPassword: string) {
@@ -136,7 +158,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid or expired reset token');
+      throw new UnauthorizedException("Invalid or expired reset token");
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
@@ -145,41 +167,44 @@ export class AuthService {
 
     await this.em.flush();
 
-    return { message: 'Password has been reset successfully' };
+    return { message: "Password has been reset successfully" };
   }
 
   async createTutorInvitation(email: string) {
     const existingUser = await this.em.findOne(User, { email });
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException("Email already exists");
     }
 
     const invitationToken = uuidv4();
     const user = new User(
-      '', // First name will be set during registration
-      '', // Last name will be set during registration
+      "", // First name will be set during registration
+      "", // Last name will be set during registration
       email,
-      '', // Password will be set during registration
+      "", // Password will be set during registration
       UserRole.TUTOR,
     );
     user.invitationToken = invitationToken;
 
     await this.em.persistAndFlush(user);
-    
+
     // Try to send email, but don't fail invitation if email fails
     try {
       await this.emailService.sendTutorInvitation(email, invitationToken);
     } catch (error) {
-      this.logger.error(`Failed to send tutor invitation email to ${email}`, error.stack);
+      this.logger.error(
+        `Failed to send tutor invitation email to ${email}`,
+        error.stack,
+      );
     }
 
-    return { message: 'Invitation sent successfully' };
+    return { message: "Invitation sent successfully" };
   }
 
   async registerTutorDirect(dto: RegisterTutorDirectDto) {
     const existingUser = await this.em.findOne(User, { email: dto.email });
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException("Email already exists");
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
@@ -200,5 +225,4 @@ export class AuthService {
     const { password: _, ...result } = user;
     return result;
   }
-
 }

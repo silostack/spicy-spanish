@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { InjectRepository } from '@mikro-orm/nestjs';
-import { Course } from './entities/course.entity';
-import { CourseSchedule } from './entities/course-schedule.entity';
-import { User, UserRole } from '../users/entities/user.entity';
-import { CreateCourseDto, UpdateCourseDto, AddStudentDto, RemoveStudentDto, AddScheduleDto, AdjustHoursDto } from './dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { EntityManager, EntityRepository } from "@mikro-orm/core";
+import { InjectRepository } from "@mikro-orm/nestjs";
+import { Course } from "./entities/course.entity";
+import { CourseSchedule } from "./entities/course-schedule.entity";
+import { User, UserRole } from "../users/entities/user.entity";
+import {
+  CreateCourseDto,
+  UpdateCourseDto,
+  AddStudentDto,
+  RemoveStudentDto,
+  AddScheduleDto,
+  AdjustHoursDto,
+} from "./dto";
 
 @Injectable()
 export class CoursesService {
@@ -20,22 +27,25 @@ export class CoursesService {
 
   async findAllCourses() {
     return this.courseRepository.findAll({
-      populate: ['tutor', 'students', 'schedules'],
-      orderBy: { title: 'ASC' },
+      populate: ["tutor", "students", "schedules"],
+      orderBy: { title: "ASC" },
     });
   }
 
   async findActiveCourses() {
     return this.courseRepository.find(
       { isActive: true },
-      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
+      {
+        populate: ["tutor", "students", "schedules"],
+        orderBy: { title: "ASC" },
+      },
     );
   }
 
   async findCourseById(id: string) {
     const course = await this.courseRepository.findOne(
       { id },
-      { populate: ['tutor', 'students', 'schedules'] },
+      { populate: ["tutor", "students", "schedules"] },
     );
 
     if (!course) {
@@ -48,26 +58,38 @@ export class CoursesService {
   async findCoursesByTutor(tutorId: string) {
     return this.courseRepository.find(
       { tutor: tutorId },
-      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
+      {
+        populate: ["tutor", "students", "schedules"],
+        orderBy: { title: "ASC" },
+      },
     );
   }
 
   async findCoursesByStudent(studentId: string) {
     return this.courseRepository.find(
       { students: studentId },
-      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
+      {
+        populate: ["tutor", "students", "schedules"],
+        orderBy: { title: "ASC" },
+      },
     );
   }
 
   async createCourse(dto: CreateCourseDto) {
-    const tutor = await this.userRepository.findOne({ id: dto.tutorId, role: UserRole.TUTOR });
+    const tutor = await this.userRepository.findOne({
+      id: dto.tutorId,
+      role: UserRole.TUTOR,
+    });
     if (!tutor) {
       throw new NotFoundException(`Tutor with ID ${dto.tutorId} not found`);
     }
 
     const students: User[] = [];
     for (const studentId of dto.studentIds) {
-      const student = await this.userRepository.findOne({ id: studentId, role: UserRole.STUDENT });
+      const student = await this.userRepository.findOne({
+        id: studentId,
+        role: UserRole.STUDENT,
+      });
       if (!student) {
         throw new NotFoundException(`Student with ID ${studentId} not found`);
       }
@@ -81,7 +103,12 @@ export class CoursesService {
     }
 
     for (const slot of dto.schedules) {
-      const schedule = new CourseSchedule(course, slot.dayOfWeek, slot.startTime, slot.endTime);
+      const schedule = new CourseSchedule(
+        course,
+        slot.dayOfWeek,
+        slot.startTime,
+        slot.endTime,
+      );
       course.schedules.add(schedule);
     }
 
@@ -105,7 +132,10 @@ export class CoursesService {
   // Student management
   async addStudent(courseId: string, dto: AddStudentDto) {
     const course = await this.findCourseById(courseId);
-    const student = await this.userRepository.findOne({ id: dto.studentId, role: UserRole.STUDENT });
+    const student = await this.userRepository.findOne({
+      id: dto.studentId,
+      role: UserRole.STUDENT,
+    });
     if (!student) {
       throw new NotFoundException(`Student with ID ${dto.studentId} not found`);
     }
@@ -116,7 +146,10 @@ export class CoursesService {
 
   async removeStudent(courseId: string, dto: RemoveStudentDto) {
     const course = await this.findCourseById(courseId);
-    const student = await this.userRepository.findOne({ id: dto.studentId, role: UserRole.STUDENT });
+    const student = await this.userRepository.findOne({
+      id: dto.studentId,
+      role: UserRole.STUDENT,
+    });
     if (!student) {
       throw new NotFoundException(`Student with ID ${dto.studentId} not found`);
     }
@@ -128,7 +161,12 @@ export class CoursesService {
   // Schedule management
   async addSchedule(courseId: string, dto: AddScheduleDto) {
     const course = await this.findCourseById(courseId);
-    const schedule = new CourseSchedule(course, dto.dayOfWeek, dto.startTime, dto.endTime);
+    const schedule = new CourseSchedule(
+      course,
+      dto.dayOfWeek,
+      dto.startTime,
+      dto.endTime,
+    );
     await this.em.persistAndFlush(schedule);
     return schedule;
   }
@@ -155,12 +193,14 @@ export class CoursesService {
   async getCourseStats() {
     const totalCourses = await this.courseRepository.count();
     const activeCourses = await this.courseRepository.count({ isActive: true });
-    const needsRenewalCourses = await this.courseRepository.count({ needsRenewal: true });
+    const needsRenewalCourses = await this.courseRepository.count({
+      needsRenewal: true,
+    });
     const recentCourses = await this.courseRepository.find(
       {},
       {
-        populate: ['tutor', 'students'],
-        orderBy: { createdAt: 'DESC' },
+        populate: ["tutor", "students"],
+        orderBy: { createdAt: "DESC" },
         limit: 5,
       },
     );

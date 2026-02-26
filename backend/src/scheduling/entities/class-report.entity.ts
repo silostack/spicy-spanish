@@ -1,7 +1,7 @@
-import { Entity, ManyToOne, PrimaryKey, Property } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { Appointment } from './appointment.entity';
-import { User } from '../../users/entities/user.entity';
+import { Entity, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { Appointment } from "./appointment.entity";
+import { User } from "../../users/entities/user.entity";
 
 @Entity()
 export class ClassReport {
@@ -17,7 +17,7 @@ export class ClassReport {
   @Property()
   subject: string;
 
-  @Property({ type: 'text' })
+  @Property({ type: "text" })
   content: string;
 
   @Property({ nullable: true })

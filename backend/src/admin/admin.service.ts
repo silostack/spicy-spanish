@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
-import { PaymentsService } from '../payments/payments.service';
-import { CoursesService } from '../courses/courses.service';
+import { Injectable } from "@nestjs/common";
+import { UsersService } from "../users/users.service";
+import { PaymentsService } from "../payments/payments.service";
+import { CoursesService } from "../courses/courses.service";
 
 @Injectable()
 export class AdminService {
