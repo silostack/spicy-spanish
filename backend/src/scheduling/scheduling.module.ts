@@ -10,6 +10,7 @@ import { CourseSchedule } from '../courses/entities/course-schedule.entity';
 import { SchedulingController } from './scheduling.controller';
 import { SchedulingService } from './scheduling.service';
 import { GoogleCalendarService } from './google-calendar.service';
+import { AppointmentGeneratorService } from './appointment-generator.service';
 import { EmailModule } from '../email/email.module';
 
 @Module({
@@ -18,7 +19,7 @@ import { EmailModule } from '../email/email.module';
     EmailModule,
   ],
   controllers: [SchedulingController],
-  providers: [SchedulingService, GoogleCalendarService],
+  providers: [SchedulingService, GoogleCalendarService, AppointmentGeneratorService],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}
