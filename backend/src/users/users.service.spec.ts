@@ -4,7 +4,6 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User, UserRole } from './entities/user.entity';
-import { StudentCourse } from '../courses/entities/student-course.entity';
 import { Transaction, TransactionStatus } from '../payments/entities/transaction.entity';
 import { Appointment } from '../scheduling/entities/appointment.entity';
 import * as bcrypt from 'bcrypt';
@@ -359,8 +358,10 @@ describe('UsersService', () => {
     it('should filter by tutorId when provided', async () => {
       const student = mockUser();
       em.find.mockImplementation((entity: any, criteria: any, options?: any) => {
-        if (entity === StudentCourse) {
-          return Promise.resolve([{ student: { id: 'user-1' } }]);
+        if (entity === Appointment && criteria?.tutor === 'tutor-1') {
+          return Promise.resolve([
+            { students: { getItems: () => [{ id: 'user-1' }] } },
+          ]);
         }
         // transactions
         return Promise.resolve([]);
@@ -372,9 +373,9 @@ describe('UsersService', () => {
       const result = await service.getStudentsWithPagination({ tutorId: 'tutor-1' });
 
       expect(em.find).toHaveBeenCalledWith(
-        StudentCourse,
+        Appointment,
         { tutor: 'tutor-1' },
-        { populate: ['student'] },
+        { populate: ['students'] },
       );
       expect(result.items).toHaveLength(1);
     });
@@ -424,9 +425,6 @@ describe('UsersService', () => {
       const endTime = new Date('2026-02-01T11:00:00Z');
 
       em.find.mockImplementation((entity: any) => {
-        if (entity === StudentCourse) {
-          return Promise.resolve([{ course: { name: 'Spanish 101' }, tutor: { id: 'tutor-1' } }]);
-        }
         if (entity === Transaction) {
           return Promise.resolve([{ hours: 10 }, { hours: 5 }]);
         }
@@ -447,7 +445,6 @@ describe('UsersService', () => {
       expect(result.totalHoursPurchased).toBe(15);
       expect(result.hoursUsed).toBe(1); // 1 hour between startTime and endTime
       expect(result.availableHours).toBe(14);
-      expect(result.courseAssignments).toHaveLength(1);
       expect(result.recentAppointments).toHaveLength(1);
     });
 
@@ -480,9 +477,11 @@ describe('UsersService', () => {
       userRepository.findOne.mockResolvedValueOnce(tutor);
 
       // getStudentsWithPagination internals
-      em.find.mockImplementation((entity: any) => {
-        if (entity === StudentCourse) {
-          return Promise.resolve([{ student: { id: 'student-1' } }]);
+      em.find.mockImplementation((entity: any, criteria: any) => {
+        if (entity === Appointment && criteria?.tutor === 'tutor-1') {
+          return Promise.resolve([
+            { students: { getItems: () => [{ id: 'student-1' }] } },
+          ]);
         }
         return Promise.resolve([]);
       });

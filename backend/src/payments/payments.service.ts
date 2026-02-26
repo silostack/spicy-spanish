@@ -418,7 +418,7 @@ export class PaymentsService {
 
     // Hours used from completed appointments
     const completedAppointments = await this.em.find(Appointment, {
-      student: studentId,
+      students: studentId,
       status: AppointmentStatus.COMPLETED,
     });
 

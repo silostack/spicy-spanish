@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, ConflictException, Logger } from '@nestj
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { User, UserRole } from './entities/user.entity';
-import { StudentCourse } from '../courses/entities/student-course.entity';
 import { Transaction, TransactionStatus } from '../payments/entities/transaction.entity';
 import { Appointment } from '../scheduling/entities/appointment.entity';
 import * as bcrypt from 'bcrypt';
@@ -167,14 +166,20 @@ export class UsersService {
     let total;
     
     if (tutorId) {
-      // Get students assigned to this tutor through StudentCourse
-      const studentCourses = await this.em.find(StudentCourse, 
+      // Get students that have had appointments with this tutor
+      const appointments = await this.em.find(Appointment,
         { tutor: tutorId },
-        { populate: ['student'] }
+        { populate: ['students'] }
       );
-      
-      const studentIds = studentCourses.map(sc => sc.student.id);
-      
+
+      const studentIdSet = new Set<string>();
+      for (const apt of appointments) {
+        for (const s of apt.students.getItems()) {
+          studentIdSet.add(s.id);
+        }
+      }
+      const studentIds = Array.from(studentIdSet);
+
       if (studentIds.length > 0) {
         criteria.id = { $in: studentIds };
         [students, total] = await this.userRepository.findAndCount(criteria, {
@@ -197,14 +202,14 @@ export class UsersService {
     // Enrich students with additional details
     const enrichedStudents = await Promise.all(
       students.map(async (student) => {
-        const [coursesCount, transactions, lastAppointment] = await Promise.all([
-          this.em.count(StudentCourse, { student: student.id }),
+        const [appointmentsCount, transactions, lastAppointment] = await Promise.all([
+          this.em.count(Appointment, { students: student.id }),
           this.em.find(Transaction, {
             student: student.id,
             status: TransactionStatus.COMPLETED,
           }),
-          this.em.findOne(Appointment, 
-            { student: student.id },
+          this.em.findOne(Appointment,
+            { students: student.id },
             { orderBy: { startTime: 'DESC' } }
           )
         ]);
@@ -214,7 +219,7 @@ export class UsersService {
         
         const enriched: StudentWithDetails = {
           ...student,
-          coursesEnrolled: coursesCount,
+          coursesEnrolled: appointmentsCount,
           availableHours,
           lastActive: lastAppointment?.startTime,
         };
@@ -245,21 +250,17 @@ export class UsersService {
     }
     
     // Get detailed information
-    const [courseAssignments, transactions, appointments] = await Promise.all([
-      this.em.find(StudentCourse, 
-        { student: id },
-        { populate: ['course', 'tutor'] }
-      ),
+    const [transactions, appointments] = await Promise.all([
       this.em.find(Transaction, {
         student: id,
         status: TransactionStatus.COMPLETED,
       }),
-      this.em.find(Appointment, 
-        { student: id },
-        { 
+      this.em.find(Appointment,
+        { students: id },
+        {
           populate: ['tutor', 'course'],
           orderBy: { startTime: 'DESC' },
-          limit: 5 
+          limit: 5,
         }
       )
     ]);
@@ -276,7 +277,6 @@ export class UsersService {
     
     return {
       ...student,
-      courseAssignments,
       transactions,
       recentAppointments: appointments,
       totalHoursPurchased,

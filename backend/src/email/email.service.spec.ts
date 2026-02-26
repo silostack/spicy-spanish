@@ -138,11 +138,11 @@ describe('EmailService', () => {
   describe('sendClassReminder', () => {
     it('should send reminder to student', async () => {
       const appointment = {
-        student: { firstName: 'John', email: 'john@test.com' },
+        students: { getItems: () => [{ firstName: 'John', email: 'john@test.com' }] },
         tutor: { fullName: 'Maria Garcia' },
         startTime: new Date('2026-03-01T14:00:00Z'),
         endTime: new Date('2026-03-01T15:00:00Z'),
-      } as Appointment;
+      } as unknown as Appointment;
 
       await service.sendClassReminder(appointment);
 
@@ -181,11 +181,11 @@ describe('EmailService', () => {
   describe('sendClassConfirmationEmail', () => {
     it('should send confirmation to both student and tutor', async () => {
       const appointment = {
-        student: { firstName: 'John', fullName: 'John Doe', email: 'john@test.com' },
+        students: { getItems: () => [{ firstName: 'John', fullName: 'John Doe', email: 'john@test.com' }] },
         tutor: { firstName: 'Maria', fullName: 'Maria Garcia', email: 'maria@test.com' },
         startTime: new Date('2026-03-01T14:00:00Z'),
         endTime: new Date('2026-03-01T15:00:00Z'),
-      } as Appointment;
+      } as unknown as Appointment;
 
       await service.sendClassConfirmationEmail(appointment);
 
@@ -208,11 +208,11 @@ describe('EmailService', () => {
   describe('sendClassCancellationEmail', () => {
     it('should send cancellation to both student and tutor', async () => {
       const appointment = {
-        student: { firstName: 'John', fullName: 'John Doe', email: 'john@test.com' },
+        students: { getItems: () => [{ firstName: 'John', fullName: 'John Doe', email: 'john@test.com' }] },
         tutor: { firstName: 'Maria', fullName: 'Maria Garcia', email: 'maria@test.com' },
         startTime: new Date('2026-03-01T14:00:00Z'),
         endTime: new Date('2026-03-01T15:00:00Z'),
-      } as Appointment;
+      } as unknown as Appointment;
 
       await service.sendClassCancellationEmail(appointment);
 
@@ -245,7 +245,7 @@ describe('EmailService', () => {
     it('should find and send reminders for upcoming appointments', async () => {
       const mockAppointment = {
         id: 'apt-1',
-        student: { firstName: 'John', email: 'john@test.com' },
+        students: { getItems: () => [{ firstName: 'John', email: 'john@test.com' }] },
         tutor: { fullName: 'Maria Garcia' },
         startTime: new Date(),
         endTime: new Date(),
@@ -267,7 +267,7 @@ describe('EmailService', () => {
     it('should handle send failures gracefully', async () => {
       const mockAppointment = {
         id: 'apt-1',
-        student: { firstName: 'John', email: 'john@test.com' },
+        students: { getItems: () => [{ firstName: 'John', email: 'john@test.com' }] },
         tutor: { fullName: 'Maria Garcia' },
         startTime: new Date(),
         endTime: new Date(),
