@@ -1,13 +1,6 @@
-import { Entity, ManyToOne, PrimaryKey, Property, Collection, OneToMany, Enum } from '@mikro-orm/core';
+import { Entity, ManyToOne, ManyToMany, PrimaryKey, Property, Collection, OneToMany } from '@mikro-orm/core';
 import { v4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
-import { CourseLesson } from './course-lesson.entity';
-
-export enum LearningLevel {
-  BEGINNER = 'beginner',
-  INTERMEDIATE = 'intermediate',
-  ADVANCED = 'advanced',
-}
 
 @Entity()
 export class Course {
@@ -17,17 +10,23 @@ export class Course {
   @Property()
   title: string;
 
-  @Property({ type: 'text' })
-  description: string;
+  @ManyToOne(() => User)
+  tutor!: User;
 
-  @Enum(() => LearningLevel)
-  learningLevel: LearningLevel;
+  @ManyToMany(() => User, undefined, { owner: true })
+  students = new Collection<User>(this);
 
-  @OneToMany(() => CourseLesson, lesson => lesson.course, { orphanRemoval: true })
-  lessons = new Collection<CourseLesson>(this);
+  @Property()
+  startDate: Date;
 
   @Property({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
+
+  @Property({ type: 'decimal', precision: 6, scale: 2, default: 0 })
+  hoursBalance: number = 0;
+
+  @Property({ default: false })
+  needsRenewal: boolean = false;
 
   @Property()
   createdAt: Date = new Date();
@@ -35,15 +34,9 @@ export class Course {
   @Property({ onUpdate: () => new Date() })
   updatedAt: Date = new Date();
 
-  constructor(
-    title: string,
-    description: string,
-    learningLevel: LearningLevel,
-    isActive: boolean = true,
-  ) {
+  constructor(title: string, tutor: User, startDate: Date) {
     this.title = title;
-    this.description = description;
-    this.learningLevel = learningLevel;
-    this.isActive = isActive;
+    this.tutor = tutor;
+    this.startDate = startDate;
   }
 }
