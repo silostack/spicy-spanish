@@ -55,6 +55,11 @@ describe('CoursesService', () => {
   };
 
   beforeEach(async () => {
+    // MikroORM Collection.add() accesses entity metadata (__meta) which is only
+    // available when MikroORM is fully bootstrapped. In pure unit tests we mock
+    // it so that Collection.add() calls on new entities don't throw.
+    jest.spyOn(Collection.prototype, 'add').mockImplementation(() => {});
+
     courseRepo = {
       findAll: jest.fn(),
       find: jest.fn(),

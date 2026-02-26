@@ -76,15 +76,14 @@ export class CoursesService {
 
     const course = new Course(dto.title, tutor, new Date(dto.startDate));
 
-    // Use em.assign to set the students collection (works in both real and test environments)
-    this.em.assign(course, { students });
+    for (const student of students) {
+      course.students.add(student);
+    }
 
-    const scheduleEntities: CourseSchedule[] = [];
     for (const slot of dto.schedules) {
       const schedule = new CourseSchedule(course, slot.dayOfWeek, slot.startTime, slot.endTime);
-      scheduleEntities.push(schedule);
+      course.schedules.add(schedule);
     }
-    this.em.assign(course, { schedules: scheduleEntities });
 
     await this.em.persistAndFlush(course);
     return course;
