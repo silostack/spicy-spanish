@@ -1,18 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
-import { LearningLevel } from './entities/course.entity';
-import { CreateCourseDto, UpdateCourseDto, CreateLessonDto, UpdateLessonDto, AssignCourseDto, UpdateProgressDto } from './dto';
+import { CreateCourseDto, UpdateCourseDto, AddStudentDto, RemoveStudentDto, AddScheduleDto, AdjustHoursDto } from './dto';
 
 @Controller('courses')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
-  // Course endpoints
   @Get()
   findAllCourses() {
     return this.coursesService.findAllCourses();
@@ -23,26 +21,31 @@ export class CoursesController {
     return this.coursesService.findActiveCourses();
   }
 
-  @Get('level/:learningLevel')
-  findCoursesByLevel(@Param('learningLevel') learningLevel: LearningLevel) {
-    return this.coursesService.findCoursesByLevel(learningLevel);
-  }
-
   @Get(':id')
   findCourseById(@Param('id') id: string) {
     return this.coursesService.findCourseById(id);
   }
 
+  @Get('tutor/:tutorId')
+  findCoursesByTutor(@Param('tutorId') tutorId: string) {
+    return this.coursesService.findCoursesByTutor(tutorId);
+  }
+
+  @Get('student/:studentId')
+  findCoursesByStudent(@Param('studentId') studentId: string) {
+    return this.coursesService.findCoursesByStudent(studentId);
+  }
+
   @Post()
   @Roles(UserRole.ADMIN)
-  createCourse(@Body() createCourseDto: CreateCourseDto) {
-    return this.coursesService.createCourse(createCourseDto);
+  createCourse(@Body() dto: CreateCourseDto) {
+    return this.coursesService.createCourse(dto);
   }
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  updateCourse(@Param('id') id: string, @Body() updateCourseDto: UpdateCourseDto) {
-    return this.coursesService.updateCourse(id, updateCourseDto);
+  updateCourse(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
+    return this.coursesService.updateCourse(id, dto);
   }
 
   @Delete(':id')
@@ -51,61 +54,37 @@ export class CoursesController {
     return this.coursesService.removeCourse(id);
   }
 
-  // Lesson endpoints
-  @Get('lessons/:id')
-  findLessonById(@Param('id') id: string) {
-    return this.coursesService.findLessonById(id);
-  }
-
-  @Post('lessons')
+  // Student management
+  @Post(':id/students')
   @Roles(UserRole.ADMIN)
-  createLesson(@Body() createLessonDto: CreateLessonDto) {
-    return this.coursesService.createLesson(createLessonDto);
+  addStudent(@Param('id') id: string, @Body() dto: AddStudentDto) {
+    return this.coursesService.addStudent(id, dto);
   }
 
-  @Patch('lessons/:id')
+  @Delete(':id/students')
   @Roles(UserRole.ADMIN)
-  updateLesson(@Param('id') id: string, @Body() updateLessonDto: UpdateLessonDto) {
-    return this.coursesService.updateLesson(id, updateLessonDto);
+  removeStudent(@Param('id') id: string, @Body() dto: RemoveStudentDto) {
+    return this.coursesService.removeStudent(id, dto);
   }
 
-  @Delete('lessons/:id')
+  // Schedule management
+  @Post(':id/schedules')
   @Roles(UserRole.ADMIN)
-  removeLesson(@Param('id') id: string) {
-    return this.coursesService.removeLesson(id);
+  addSchedule(@Param('id') id: string, @Body() dto: AddScheduleDto) {
+    return this.coursesService.addSchedule(id, dto);
   }
 
-  // Student Course endpoints
-  @Get('assignments/:id')
-  findStudentCoursesById(@Param('id') id: string) {
-    return this.coursesService.findStudentCoursesById(id);
-  }
-
-  @Get('assignments/student/:studentId')
-  findStudentCoursesByStudent(@Param('studentId') studentId: string) {
-    return this.coursesService.findStudentCoursesByStudent(studentId);
-  }
-
-  @Get('assignments/tutor/:tutorId')
-  findStudentCoursesByTutor(@Param('tutorId') tutorId: string) {
-    return this.coursesService.findStudentCoursesByTutor(tutorId);
-  }
-
-  @Post('assignments')
+  @Delete('schedules/:scheduleId')
   @Roles(UserRole.ADMIN)
-  assignCourse(@Body() assignCourseDto: AssignCourseDto) {
-    return this.coursesService.assignCourse(assignCourseDto);
+  removeSchedule(@Param('scheduleId') scheduleId: string) {
+    return this.coursesService.removeSchedule(scheduleId);
   }
 
-  @Patch('assignments/:id/progress')
-  updateStudentCourseProgress(@Param('id') id: string, @Body() updateData: UpdateProgressDto) {
-    return this.coursesService.updateStudentCourseProgress(id, updateData.progress);
-  }
-
-  @Delete('assignments/:id')
+  // Hours management
+  @Patch(':id/hours')
   @Roles(UserRole.ADMIN)
-  removeStudentCourse(@Param('id') id: string) {
-    return this.coursesService.removeStudentCourse(id);
+  adjustHours(@Param('id') id: string, @Body() dto: AdjustHoursDto) {
+    return this.coursesService.adjustHours(id, dto);
   }
 
   // Stats
