@@ -5,17 +5,40 @@ import Link from 'next/link';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
-type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+interface CourseUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+interface CourseSchedule {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
 
 interface Course {
   id: string;
   title: string;
-  description: string;
-  learningLevel: LearningLevel;
-  lessonsCount?: number;
-  studentsCount?: number;
-  createdAt: string;
+  tutor: CourseUser;
+  students: CourseUser[];
+  schedules: CourseSchedule[];
+  startDate: string;
   isActive: boolean;
+  hoursBalance: number;
+  needsRenewal: boolean;
+  createdAt: string;
+}
+
+function formatScheduleSlots(schedules: CourseSchedule[]): string {
+  if (!schedules || schedules.length === 0) return 'No schedule';
+  return schedules
+    .map((s) => `${DAY_NAMES[s.dayOfWeek]} ${s.startTime}-${s.endTime}`)
+    .join(', ');
 }
 
 export default function CoursesPage() {
@@ -38,29 +61,32 @@ export default function CoursesPage() {
       setError(null);
       const response = await api.get('/courses');
 
-      let allCourses: Course[] = Array.isArray(response.data) ? response.data : (response.data?.items || []);
+      let allCourses: Course[] = Array.isArray(response.data)
+        ? response.data
+        : response.data?.items || [];
 
       // Client-side filtering
       if (filter === 'active') {
-        allCourses = allCourses.filter(c => c.isActive);
+        allCourses = allCourses.filter((c) => c.isActive);
       } else if (filter === 'inactive') {
-        allCourses = allCourses.filter(c => !c.isActive);
-      } else if (filter === 'beginner' || filter === 'intermediate' || filter === 'advanced') {
-        allCourses = allCourses.filter(c => c.learningLevel === filter);
+        allCourses = allCourses.filter((c) => !c.isActive);
+      } else if (filter === 'renewal') {
+        allCourses = allCourses.filter((c) => c.needsRenewal);
       }
 
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
-        allCourses = allCourses.filter(c =>
-          c.title.toLowerCase().includes(search) ||
-          c.description.toLowerCase().includes(search)
+        allCourses = allCourses.filter(
+          (c) =>
+            c.title.toLowerCase().includes(search) ||
+            `${c.tutor?.firstName} ${c.tutor?.lastName}`.toLowerCase().includes(search),
         );
       }
 
       setCourses(allCourses);
       setTotalPages(Math.ceil(allCourses.length / 10));
       setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to load courses');
       setCourses([]);
       setLoading(false);
@@ -73,29 +99,18 @@ export default function CoursesPage() {
     fetchCourses();
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   const toggleCourseStatus = async (courseId: string, isActive: boolean) => {
     try {
       await api.patch(`/courses/${courseId}`, {
-        isActive: !isActive
+        isActive: !isActive,
       });
-      
-      // Update the courses list
-      setCourses(prevCourses => 
-        prevCourses.map(course => 
-          course.id === courseId 
-            ? { ...course, isActive: !isActive } 
-            : course
-        )
+
+      setCourses((prevCourses) =>
+        prevCourses.map((course) =>
+          course.id === courseId ? { ...course, isActive: !isActive } : course,
+        ),
       );
-    } catch (error) {
+    } catch {
       alert('Failed to update course status');
     }
   };
@@ -127,26 +142,31 @@ export default function CoursesPage() {
         <div>
           <h1 className="text-3xl font-bold text-spicy-dark">Courses</h1>
           <p className="text-gray-600">
-            {user?.role === 'admin' 
-              ? 'Manage all courses and lessons' 
+            {user?.role === 'admin'
+              ? 'Manage all courses and class groups'
               : user?.role === 'tutor'
-              ? 'View courses and manage your lessons'
-              : 'Browse available courses'}
+                ? 'View your assigned courses'
+                : 'View your enrolled courses'}
           </p>
         </div>
-        {(user?.role === 'admin' || user?.role === 'tutor') && (
+        {user?.role === 'admin' && (
           <Link
             href="/dashboard/courses/new"
             className="btn-primary bg-spicy-red hover:bg-spicy-orange text-white font-bold py-2 px-4 rounded-lg flex items-center"
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              className="h-5 w-5 mr-2" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-2"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             Create Course
           </Link>
@@ -188,37 +208,17 @@ export default function CoursesPage() {
               Inactive
             </button>
             <button
-              onClick={() => setFilter('beginner')}
+              onClick={() => setFilter('renewal')}
               className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'beginner'
-                  ? 'bg-spicy-red text-white'
+                filter === 'renewal'
+                  ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Beginner
-            </button>
-            <button
-              onClick={() => setFilter('intermediate')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'intermediate'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Intermediate
-            </button>
-            <button
-              onClick={() => setFilter('advanced')}
-              className={`px-3 py-1 rounded-full text-sm ${
-                filter === 'advanced'
-                  ? 'bg-spicy-red text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Advanced
+              Needs Renewal
             </button>
           </div>
-          
+
           <form onSubmit={handleSearch} className="flex">
             <input
               type="text"
@@ -262,13 +262,16 @@ export default function CoursesPage() {
                     Course
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Level
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Lessons
+                    Tutor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Students
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Schedule
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hours Balance
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -283,52 +286,66 @@ export default function CoursesPage() {
                   courses.map((course) => (
                     <tr key={course.id}>
                       <td className="px-6 py-4">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {course.title}
+                        <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                        {course.needsRenewal && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 mt-1">
+                            Renewal Needed
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {course.tutor
+                          ? `${course.tutor.firstName} ${course.tutor.lastName}`
+                          : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <div>{course.students?.length ?? 0} student(s)</div>
+                        {course.students && course.students.length > 0 && (
+                          <div className="text-xs text-gray-400">
+                            {course.students
+                              .map((s) => `${s.firstName} ${s.lastName}`)
+                              .join(', ')}
                           </div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {course.description}
-                          </div>
-                        </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {formatScheduleSlots(course.schedules)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {course.hoursBalance} hrs remaining
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          course.learningLevel === 'beginner' 
-                            ? 'bg-green-100 text-green-800' 
-                            : course.learningLevel === 'intermediate'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {course.learningLevel.charAt(0).toUpperCase() + course.learningLevel.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {course.lessonsCount} lessons
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {course.studentsCount} students
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          course.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            course.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
                           {course.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
-                          <Link href={`/dashboard/courses/${course.id}`} className="text-spicy-red hover:text-spicy-orange">
+                          <Link
+                            href={`/dashboard/courses/${course.id}`}
+                            className="text-spicy-red hover:text-spicy-orange"
+                          >
                             View
                           </Link>
-                          <Link href={`/dashboard/courses/${course.id}/edit`} className="text-blue-600 hover:text-blue-900">
+                          <Link
+                            href={`/dashboard/courses/${course.id}/edit`}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
                             Edit
                           </Link>
                           <button
                             onClick={() => toggleCourseStatus(course.id, course.isActive)}
-                            className={course.isActive ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}
+                            className={
+                              course.isActive
+                                ? 'text-yellow-600 hover:text-yellow-900'
+                                : 'text-green-600 hover:text-green-900'
+                            }
                           >
                             {course.isActive ? 'Deactivate' : 'Activate'}
                           </button>
@@ -338,7 +355,7 @@ export default function CoursesPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       No courses found
                     </td>
                   </tr>
@@ -354,28 +371,56 @@ export default function CoursesPage() {
             courses.map((course) => (
               <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="h-20 bg-spicy-red flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-12 w-12 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                    />
                   </svg>
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-spicy-dark">{course.title}</h3>
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      course.learningLevel === 'beginner' 
-                        ? 'bg-green-100 text-green-800' 
-                        : course.learningLevel === 'intermediate'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {course.learningLevel.charAt(0).toUpperCase() + course.learningLevel.slice(1)}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          course.isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {course.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                      {course.needsRenewal && (
+                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                          Renewal Needed
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">{course.description}</p>
-                  <div className="flex justify-between text-sm text-gray-500 mb-4">
-                    <span>{course.lessonsCount} lessons</span>
-                    <span>{course.studentsCount} students enrolled</span>
-                  </div>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Tutor:{' '}
+                    {course.tutor
+                      ? `${course.tutor.firstName} ${course.tutor.lastName}`
+                      : '—'}
+                  </p>
+                  <p className="text-sm text-gray-500 mb-1">
+                    {course.students?.length ?? 0} student(s)
+                  </p>
+                  <p className="text-sm text-gray-500 mb-1">
+                    {formatScheduleSlots(course.schedules)}
+                  </p>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {course.hoursBalance} hrs remaining
+                  </p>
                   <Link
                     href={`/dashboard/courses/${course.id}`}
                     className="block w-full text-center py-2 px-4 bg-spicy-red text-white rounded-lg hover:bg-spicy-orange transition-colors"
@@ -387,11 +432,24 @@ export default function CoursesPage() {
             ))
           ) : (
             <div className="col-span-full bg-white rounded-xl shadow-md p-8 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-16 w-16 mx-auto text-gray-400 mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                />
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
-              <p className="text-gray-600">No courses match your current filters or search terms.</p>
+              <p className="text-gray-600">
+                No courses match your current filters or search terms.
+              </p>
             </div>
           )}
         </div>
