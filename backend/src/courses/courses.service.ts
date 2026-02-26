@@ -1,72 +1,98 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { Course, LearningLevel } from './entities/course.entity';
-import { CourseLesson } from './entities/course-lesson.entity';
-import { StudentCourse } from './entities/student-course.entity';
+import { Course } from './entities/course.entity';
+import { CourseSchedule } from './entities/course-schedule.entity';
 import { User, UserRole } from '../users/entities/user.entity';
-import { CreateCourseDto, UpdateCourseDto, CreateLessonDto, UpdateLessonDto, AssignCourseDto } from './dto';
+import { CreateCourseDto, UpdateCourseDto, AddStudentDto, RemoveStudentDto, AddScheduleDto, AdjustHoursDto } from './dto';
 
 @Injectable()
 export class CoursesService {
   constructor(
     @InjectRepository(Course)
     private readonly courseRepository: EntityRepository<Course>,
-    @InjectRepository(CourseLesson)
-    private readonly lessonRepository: EntityRepository<CourseLesson>,
-    @InjectRepository(StudentCourse)
-    private readonly studentCourseRepository: EntityRepository<StudentCourse>,
+    @InjectRepository(CourseSchedule)
+    private readonly scheduleRepository: EntityRepository<CourseSchedule>,
     @InjectRepository(User)
     private readonly userRepository: EntityRepository<User>,
     private readonly em: EntityManager,
   ) {}
 
-  // Course methods
   async findAllCourses() {
     return this.courseRepository.findAll({
+      populate: ['tutor', 'students', 'schedules'],
       orderBy: { title: 'ASC' },
     });
   }
 
   async findActiveCourses() {
-    return this.courseRepository.find({ isActive: true }, {
-      orderBy: { title: 'ASC' },
-    });
-  }
-
-  async findCoursesByLevel(learningLevel: LearningLevel) {
-    return this.courseRepository.find({ learningLevel, isActive: true }, {
-      orderBy: { title: 'ASC' },
-    });
+    return this.courseRepository.find(
+      { isActive: true },
+      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
+    );
   }
 
   async findCourseById(id: string) {
-    const course = await this.courseRepository.findOne({ id }, {
-      populate: ['lessons'],
-    });
-    
+    const course = await this.courseRepository.findOne(
+      { id },
+      { populate: ['tutor', 'students', 'schedules'] },
+    );
+
     if (!course) {
       throw new NotFoundException(`Course with ID ${id} not found`);
     }
-    
+
     return course;
   }
 
-  async createCourse(createCourseDto: CreateCourseDto) {
-    const course = new Course(
-      createCourseDto.title,
-      createCourseDto.description,
-      createCourseDto.learningLevel,
-      createCourseDto.isActive !== undefined ? createCourseDto.isActive : true,
+  async findCoursesByTutor(tutorId: string) {
+    return this.courseRepository.find(
+      { tutor: tutorId },
+      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
     );
-    
+  }
+
+  async findCoursesByStudent(studentId: string) {
+    return this.courseRepository.find(
+      { students: studentId },
+      { populate: ['tutor', 'students', 'schedules'], orderBy: { title: 'ASC' } },
+    );
+  }
+
+  async createCourse(dto: CreateCourseDto) {
+    const tutor = await this.userRepository.findOne({ id: dto.tutorId, role: UserRole.TUTOR });
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${dto.tutorId} not found`);
+    }
+
+    const students: User[] = [];
+    for (const studentId of dto.studentIds) {
+      const student = await this.userRepository.findOne({ id: studentId, role: UserRole.STUDENT });
+      if (!student) {
+        throw new NotFoundException(`Student with ID ${studentId} not found`);
+      }
+      students.push(student);
+    }
+
+    const course = new Course(dto.title, tutor, new Date(dto.startDate));
+
+    // Use em.assign to set the students collection (works in both real and test environments)
+    this.em.assign(course, { students });
+
+    const scheduleEntities: CourseSchedule[] = [];
+    for (const slot of dto.schedules) {
+      const schedule = new CourseSchedule(course, slot.dayOfWeek, slot.startTime, slot.endTime);
+      scheduleEntities.push(schedule);
+    }
+    this.em.assign(course, { schedules: scheduleEntities });
+
     await this.em.persistAndFlush(course);
     return course;
   }
 
-  async updateCourse(id: string, updateCourseDto: UpdateCourseDto) {
+  async updateCourse(id: string, dto: UpdateCourseDto) {
     const course = await this.findCourseById(id);
-    this.em.assign(course, updateCourseDto);
+    this.em.assign(course, dto);
     await this.em.flush();
     return course;
   }
@@ -77,164 +103,74 @@ export class CoursesService {
     return { id, deleted: true };
   }
 
-  // Lesson methods
-  async findLessonById(id: string) {
-    const lesson = await this.lessonRepository.findOne({ id }, {
-      populate: ['course'],
-    });
-    
-    if (!lesson) {
-      throw new NotFoundException(`Lesson with ID ${id} not found`);
-    }
-    
-    return lesson;
-  }
-
-  async createLesson(createLessonDto: CreateLessonDto) {
-    const course = await this.findCourseById(createLessonDto.courseId);
-    
-    const lesson = new CourseLesson(
-      course,
-      createLessonDto.title,
-      createLessonDto.content,
-      createLessonDto.order,
-    );
-    
-    await this.em.persistAndFlush(lesson);
-    return lesson;
-  }
-
-  async updateLesson(id: string, updateLessonDto: UpdateLessonDto) {
-    const lesson = await this.findLessonById(id);
-    this.em.assign(lesson, updateLessonDto);
-    await this.em.flush();
-    return lesson;
-  }
-
-  async removeLesson(id: string) {
-    const lesson = await this.findLessonById(id);
-    await this.em.removeAndFlush(lesson);
-    return { id, deleted: true };
-  }
-
-  // Student Course methods
-  async findStudentCoursesById(id: string) {
-    const studentCourse = await this.studentCourseRepository.findOne({ id }, {
-      populate: ['student', 'tutor', 'course'],
-    });
-    
-    if (!studentCourse) {
-      throw new NotFoundException(`StudentCourse with ID ${id} not found`);
-    }
-    
-    return studentCourse;
-  }
-
-  async findStudentCoursesByStudent(studentId: string) {
-    return this.studentCourseRepository.find(
-      { student: studentId },
-      {
-        populate: ['student', 'tutor', 'course'],
-        orderBy: { createdAt: 'DESC' },
-      }
-    );
-  }
-
-  async findStudentCoursesByTutor(tutorId: string) {
-    return this.studentCourseRepository.find(
-      { tutor: tutorId },
-      {
-        populate: ['student', 'tutor', 'course'],
-        orderBy: { createdAt: 'DESC' },
-      }
-    );
-  }
-
-  async assignCourse(assignCourseDto: AssignCourseDto) {
-    const student = await this.userRepository.findOne({ 
-      id: assignCourseDto.studentId,
-      role: UserRole.STUDENT 
-    });
-    
+  // Student management
+  async addStudent(courseId: string, dto: AddStudentDto) {
+    const course = await this.findCourseById(courseId);
+    const student = await this.userRepository.findOne({ id: dto.studentId, role: UserRole.STUDENT });
     if (!student) {
-      throw new NotFoundException(`Student with ID ${assignCourseDto.studentId} not found`);
+      throw new NotFoundException(`Student with ID ${dto.studentId} not found`);
     }
-    
-    const tutor = await this.userRepository.findOne({ 
-      id: assignCourseDto.tutorId,
-      role: UserRole.TUTOR 
-    });
-    
-    if (!tutor) {
-      throw new NotFoundException(`Tutor with ID ${assignCourseDto.tutorId} not found`);
-    }
-    
-    const course = await this.findCourseById(assignCourseDto.courseId);
-    
-    const studentCourse = new StudentCourse(
-      student,
-      tutor,
-      course
-    );
-    
-    await this.em.persistAndFlush(studentCourse);
-    return studentCourse;
-  }
-
-  async updateStudentCourseProgress(id: string, progress: number) {
-    const studentCourse = await this.findStudentCoursesById(id);
-    studentCourse.progress = progress;
+    course.students.add(student);
     await this.em.flush();
-    return studentCourse;
+    return course;
   }
 
-  async removeStudentCourse(id: string) {
-    const studentCourse = await this.findStudentCoursesById(id);
-    await this.em.removeAndFlush(studentCourse);
-    return { id, deleted: true };
-  }
-
-  // Dashboard stats
-  async getCourseStats() {
-    const [
-      totalCourses,
-      totalLessons,
-      activeCourseAssignments,
-      studentCourses
-    ] = await Promise.all([
-      this.courseRepository.count(),
-      this.lessonRepository.count(),
-      this.studentCourseRepository.count(),
-      this.studentCourseRepository.findAll()
-    ]);
-    
-    // Calculate completed lessons from progress
-    let completedLessons = 0;
-    for (const sc of studentCourses) {
-      if (sc.progress > 0) {
-        // Get total lessons for this course
-        const courseLessons = await this.lessonRepository.count({ course: sc.course });
-        // Calculate completed lessons based on progress percentage
-        const courseCompletedLessons = Math.floor(courseLessons * (sc.progress / 100));
-        completedLessons += courseCompletedLessons;
-      }
+  async removeStudent(courseId: string, dto: RemoveStudentDto) {
+    const course = await this.findCourseById(courseId);
+    const student = await this.userRepository.findOne({ id: dto.studentId, role: UserRole.STUDENT });
+    if (!student) {
+      throw new NotFoundException(`Student with ID ${dto.studentId} not found`);
     }
-    
-    const recentAssignments = await this.studentCourseRepository.find(
+    course.students.remove(student);
+    await this.em.flush();
+    return course;
+  }
+
+  // Schedule management
+  async addSchedule(courseId: string, dto: AddScheduleDto) {
+    const course = await this.findCourseById(courseId);
+    const schedule = new CourseSchedule(course, dto.dayOfWeek, dto.startTime, dto.endTime);
+    await this.em.persistAndFlush(schedule);
+    return schedule;
+  }
+
+  async removeSchedule(scheduleId: string) {
+    const schedule = await this.scheduleRepository.findOne({ id: scheduleId });
+    if (!schedule) {
+      throw new NotFoundException(`Schedule with ID ${scheduleId} not found`);
+    }
+    await this.em.removeAndFlush(schedule);
+    return { id: scheduleId, deleted: true };
+  }
+
+  // Hours management
+  async adjustHours(courseId: string, dto: AdjustHoursDto) {
+    const course = await this.findCourseById(courseId);
+    course.hoursBalance = Number(course.hoursBalance) + dto.hours;
+    course.needsRenewal = course.hoursBalance <= 0;
+    await this.em.flush();
+    return course;
+  }
+
+  // Stats
+  async getCourseStats() {
+    const totalCourses = await this.courseRepository.count();
+    const activeCourses = await this.courseRepository.count({ isActive: true });
+    const needsRenewalCourses = await this.courseRepository.count({ needsRenewal: true });
+    const recentCourses = await this.courseRepository.find(
       {},
       {
-        populate: ['student', 'tutor', 'course'],
+        populate: ['tutor', 'students'],
         orderBy: { createdAt: 'DESC' },
         limit: 5,
-      }
+      },
     );
-    
+
     return {
       totalCourses,
-      totalLessons,
-      activeCourseAssignments,
-      completedLessons,
-      recentAssignments,
+      activeCourses,
+      needsRenewalCourses,
+      recentCourses,
     };
   }
 }
