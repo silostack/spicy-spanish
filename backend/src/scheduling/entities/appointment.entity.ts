@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, PrimaryKey, Property, Enum } from '@mikro-orm/core';
+import { Entity, ManyToOne, ManyToMany, PrimaryKey, Property, Enum, Collection } from '@mikro-orm/core';
 import { v4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
 import { Course } from '../../courses/entities/course.entity';
@@ -15,14 +15,14 @@ export class Appointment {
   @PrimaryKey()
   id: string = v4();
 
-  @ManyToOne(() => User)
-  student!: User;
+  @ManyToMany(() => User, undefined, { owner: true })
+  students = new Collection<User>(this);
 
   @ManyToOne(() => User)
   tutor!: User;
 
-  @ManyToOne(() => Course, { nullable: true })
-  course?: Course;
+  @ManyToOne(() => Course)
+  course!: Course;
 
   @Property()
   startTime: Date;
@@ -39,6 +39,9 @@ export class Appointment {
   @Property({ nullable: true })
   notes?: string;
 
+  @Property({ nullable: true })
+  creditedBack?: boolean;
+
   @Property()
   createdAt: Date = new Date();
 
@@ -47,32 +50,30 @@ export class Appointment {
 
   @Property({ default: false })
   reminderSent: boolean = false;
-  
+
   @Property({ nullable: true })
   reminderSentAt?: Date;
-  
+
   @Property({ default: false })
   dayBeforeReminderSent: boolean = false;
-  
+
   @Property({ nullable: true })
   dayBeforeReminderSentAt?: Date;
-  
+
   @Property({ default: false })
   confirmationEmailSent: boolean = false;
 
   constructor(
-    student: User,
     tutor: User,
+    course: Course,
     startTime: Date,
     endTime: Date,
     status: AppointmentStatus = AppointmentStatus.SCHEDULED,
-    course?: Course,
   ) {
-    this.student = student;
     this.tutor = tutor;
+    this.course = course;
     this.startTime = startTime;
     this.endTime = endTime;
     this.status = status;
-    this.course = course;
   }
 }
