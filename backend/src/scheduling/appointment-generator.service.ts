@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { InjectRepository } from '@mikro-orm/nestjs';
-import { Course } from '../courses/entities/course.entity';
-import { Appointment, AppointmentStatus } from './entities/appointment.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { EntityManager, EntityRepository } from "@mikro-orm/core";
+import { InjectRepository } from "@mikro-orm/nestjs";
+import { Course } from "../courses/entities/course.entity";
+import { Appointment, AppointmentStatus } from "./entities/appointment.entity";
 
 @Injectable()
 export class AppointmentGeneratorService {
@@ -19,11 +19,11 @@ export class AppointmentGeneratorService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async generateAppointments() {
-    this.logger.log('Starting appointment generation...');
+    this.logger.log("Starting appointment generation...");
 
     const courses = await this.courseRepository.find(
       { isActive: true },
-      { populate: ['tutor', 'students', 'schedules'] },
+      { populate: ["tutor", "students", "schedules"] },
     );
 
     for (const course of courses) {
@@ -52,8 +52,8 @@ export class AppointmentGeneratorService {
         while (current <= fourWeeksOut) {
           if (current.getDay() === schedule.dayOfWeek) {
             // Build the appointment start/end times
-            const [startH, startM] = schedule.startTime.split(':').map(Number);
-            const [endH, endM] = schedule.endTime.split(':').map(Number);
+            const [startH, startM] = schedule.startTime.split(":").map(Number);
+            const [endH, endM] = schedule.endTime.split(":").map(Number);
 
             const appointmentStart = new Date(current);
             appointmentStart.setHours(startH, startM, 0, 0);
@@ -82,7 +82,9 @@ export class AppointmentGeneratorService {
               appointmentsToCreate.push(appointment);
 
               // Deduct hours
-              const durationHours = (appointmentEnd.getTime() - appointmentStart.getTime()) / (1000 * 60 * 60);
+              const durationHours =
+                (appointmentEnd.getTime() - appointmentStart.getTime()) /
+                (1000 * 60 * 60);
               course.hoursBalance = Number(course.hoursBalance) - durationHours;
             }
           }
@@ -96,13 +98,17 @@ export class AppointmentGeneratorService {
 
         if (course.hoursBalance <= 0) {
           course.needsRenewal = true;
+        } else {
+          course.needsRenewal = false;
         }
         await this.em.flush();
 
-        this.logger.log(`Generated ${appointmentsToCreate.length} appointments for course "${course.title}"`);
+        this.logger.log(
+          `Generated ${appointmentsToCreate.length} appointments for course "${course.title}"`,
+        );
       }
     }
 
-    this.logger.log('Appointment generation complete.');
+    this.logger.log("Appointment generation complete.");
   }
 }

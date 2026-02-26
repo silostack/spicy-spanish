@@ -1,12 +1,28 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
-import { CoursesService } from './courses.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '../users/entities/user.entity';
-import { CreateCourseDto, UpdateCourseDto, AddStudentDto, RemoveStudentDto, AddScheduleDto, AdjustHoursDto } from './dto';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from "@nestjs/common";
+import { CoursesService } from "./courses.service";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import { Roles } from "../common/decorators/roles.decorator";
+import { UserRole } from "../users/entities/user.entity";
+import {
+  CreateCourseDto,
+  UpdateCourseDto,
+  AddStudentDto,
+  RemoveStudentDto,
+  AddScheduleDto,
+  AdjustHoursDto,
+} from "./dto";
 
-@Controller('courses')
+@Controller("courses")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
@@ -16,24 +32,30 @@ export class CoursesController {
     return this.coursesService.findAllCourses();
   }
 
-  @Get('active')
+  @Get("active")
   findActiveCourses() {
     return this.coursesService.findActiveCourses();
   }
 
-  @Get(':id')
-  findCourseById(@Param('id') id: string) {
-    return this.coursesService.findCourseById(id);
-  }
-
-  @Get('tutor/:tutorId')
-  findCoursesByTutor(@Param('tutorId') tutorId: string) {
+  @Get("tutor/:tutorId")
+  findCoursesByTutor(@Param("tutorId") tutorId: string) {
     return this.coursesService.findCoursesByTutor(tutorId);
   }
 
-  @Get('student/:studentId')
-  findCoursesByStudent(@Param('studentId') studentId: string) {
+  @Get("student/:studentId")
+  findCoursesByStudent(@Param("studentId") studentId: string) {
     return this.coursesService.findCoursesByStudent(studentId);
+  }
+
+  @Get("stats")
+  @Roles(UserRole.ADMIN)
+  getCourseStats() {
+    return this.coursesService.getCourseStats();
+  }
+
+  @Get(":id")
+  findCourseById(@Param("id") id: string) {
+    return this.coursesService.findCourseById(id);
   }
 
   @Post()
@@ -42,55 +64,48 @@ export class CoursesController {
     return this.coursesService.createCourse(dto);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN)
-  updateCourse(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
+  updateCourse(@Param("id") id: string, @Body() dto: UpdateCourseDto) {
     return this.coursesService.updateCourse(id, dto);
   }
 
-  @Delete(':id')
-  @Roles(UserRole.ADMIN)
-  removeCourse(@Param('id') id: string) {
-    return this.coursesService.removeCourse(id);
-  }
-
   // Student management
-  @Post(':id/students')
+  @Post(":id/students")
   @Roles(UserRole.ADMIN)
-  addStudent(@Param('id') id: string, @Body() dto: AddStudentDto) {
+  addStudent(@Param("id") id: string, @Body() dto: AddStudentDto) {
     return this.coursesService.addStudent(id, dto);
   }
 
-  @Delete(':id/students')
+  @Delete(":id/students")
   @Roles(UserRole.ADMIN)
-  removeStudent(@Param('id') id: string, @Body() dto: RemoveStudentDto) {
+  removeStudent(@Param("id") id: string, @Body() dto: RemoveStudentDto) {
     return this.coursesService.removeStudent(id, dto);
   }
 
   // Schedule management
-  @Post(':id/schedules')
+  @Post(":id/schedules")
   @Roles(UserRole.ADMIN)
-  addSchedule(@Param('id') id: string, @Body() dto: AddScheduleDto) {
+  addSchedule(@Param("id") id: string, @Body() dto: AddScheduleDto) {
     return this.coursesService.addSchedule(id, dto);
   }
 
-  @Delete('schedules/:scheduleId')
+  @Delete("schedules/:scheduleId")
   @Roles(UserRole.ADMIN)
-  removeSchedule(@Param('scheduleId') scheduleId: string) {
+  removeSchedule(@Param("scheduleId") scheduleId: string) {
     return this.coursesService.removeSchedule(scheduleId);
   }
 
   // Hours management
-  @Patch(':id/hours')
+  @Patch(":id/hours")
   @Roles(UserRole.ADMIN)
-  adjustHours(@Param('id') id: string, @Body() dto: AdjustHoursDto) {
+  adjustHours(@Param("id") id: string, @Body() dto: AdjustHoursDto) {
     return this.coursesService.adjustHours(id, dto);
   }
 
-  // Stats
-  @Get('stats')
+  @Delete(":id")
   @Roles(UserRole.ADMIN)
-  getCourseStats() {
-    return this.coursesService.getCourseStats();
+  removeCourse(@Param("id") id: string) {
+    return this.coursesService.removeCourse(id);
   }
 }

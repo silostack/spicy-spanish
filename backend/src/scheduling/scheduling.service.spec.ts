@@ -12,6 +12,39 @@ import { ClassReport } from "./entities/class-report.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { Course } from "../courses/entities/course.entity";
 
+// Mock the Appointment entity so that `new Appointment(...)` in the service
+// returns a plain object with a simple students collection stub rather than a
+// real MikroORM Collection (which requires metadata to be initialised and
+// therefore fails in unit-test context).
+jest.mock("./entities/appointment.entity", () => {
+  const original = jest.requireActual("./entities/appointment.entity");
+  class MockAppointment {
+    id = "appt-new";
+    students = { add: jest.fn(), getItems: () => [] };
+    tutor: any;
+    course: any;
+    startTime: Date;
+    endTime: Date;
+    status = original.AppointmentStatus.SCHEDULED;
+    notes?: string;
+    googleCalendarEventId?: string;
+    confirmationEmailSent = false;
+    reminderSent = false;
+    dayBeforeReminderSent = false;
+    creditedBack?: boolean;
+    createdAt = new Date();
+    updatedAt = new Date();
+
+    constructor(tutor: any, course: any, startTime: Date, endTime: Date) {
+      this.tutor = tutor;
+      this.course = course;
+      this.startTime = startTime;
+      this.endTime = endTime;
+    }
+  }
+  return { ...original, Appointment: MockAppointment };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers to build mock entities
 // ---------------------------------------------------------------------------

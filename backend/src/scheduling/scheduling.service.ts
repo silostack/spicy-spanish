@@ -1,14 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { InjectRepository } from '@mikro-orm/nestjs';
-import { Appointment, AppointmentStatus } from './entities/appointment.entity';
-import { Availability } from './entities/availability.entity';
-import { Attendance, AttendanceStatus } from './entities/attendance.entity';
-import { ClassReport } from './entities/class-report.entity';
-import { User, UserRole } from '../users/entities/user.entity';
-import { Course } from '../courses/entities/course.entity';
-import { EmailService } from '../email/email.service';
-import { GoogleCalendarService } from './google-calendar.service';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { EntityManager, EntityRepository } from "@mikro-orm/core";
+import { InjectRepository } from "@mikro-orm/nestjs";
+import { Appointment, AppointmentStatus } from "./entities/appointment.entity";
+import { Availability } from "./entities/availability.entity";
+import { Attendance, AttendanceStatus } from "./entities/attendance.entity";
+import { ClassReport } from "./entities/class-report.entity";
+import { User, UserRole } from "../users/entities/user.entity";
+import { Course } from "../courses/entities/course.entity";
+import { EmailService } from "../email/email.service";
+import { GoogleCalendarService } from "./google-calendar.service";
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
@@ -19,7 +24,7 @@ import {
   UpdateAttendanceDto,
   CreateClassReportDto,
   UpdateClassReportDto,
-} from './dto';
+} from "./dto";
 
 @Injectable()
 export class SchedulingService {
@@ -46,15 +51,18 @@ export class SchedulingService {
   // Appointment methods
   async findAllAppointments() {
     return this.appointmentRepository.findAll({
-      populate: ['students', 'tutor', 'course'],
-      orderBy: { startTime: 'ASC' },
+      populate: ["students", "tutor", "course"],
+      orderBy: { startTime: "ASC" },
     });
   }
 
   async findAppointmentById(id: string) {
-    const appointment = await this.appointmentRepository.findOne({ id }, {
-      populate: ['students', 'tutor', 'course'],
-    });
+    const appointment = await this.appointmentRepository.findOne(
+      { id },
+      {
+        populate: ["students", "tutor", "course"],
+      },
+    );
 
     if (!appointment) {
       throw new NotFoundException(`Appointment with ID ${id} not found`);
@@ -67,9 +75,9 @@ export class SchedulingService {
     return this.appointmentRepository.find(
       { students: studentId },
       {
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
-      }
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
+      },
     );
   }
 
@@ -77,9 +85,9 @@ export class SchedulingService {
     return this.appointmentRepository.find(
       { tutor: tutorId },
       {
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
-      }
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
+      },
     );
   }
 
@@ -92,9 +100,9 @@ export class SchedulingService {
         status: AppointmentStatus.SCHEDULED,
       },
       {
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
-      }
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
+      },
     );
   }
 
@@ -107,9 +115,9 @@ export class SchedulingService {
         status: AppointmentStatus.SCHEDULED,
       },
       {
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
-      }
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
+      },
     );
   }
 
@@ -132,23 +140,31 @@ export class SchedulingService {
     });
 
     if (!tutor) {
-      throw new NotFoundException(`Tutor with ID ${createAppointmentDto.tutorId} not found`);
+      throw new NotFoundException(
+        `Tutor with ID ${createAppointmentDto.tutorId} not found`,
+      );
     }
 
-    const course = await this.courseRepository.findOne({ id: createAppointmentDto.courseId });
+    const course = await this.courseRepository.findOne({
+      id: createAppointmentDto.courseId,
+    });
     if (!course) {
-      throw new NotFoundException(`Course with ID ${createAppointmentDto.courseId} not found`);
+      throw new NotFoundException(
+        `Course with ID ${createAppointmentDto.courseId} not found`,
+      );
     }
 
     // Check for time conflicts
     const conflicts = await this.checkTimeConflicts(
       tutor.id,
       createAppointmentDto.startTime,
-      createAppointmentDto.endTime
+      createAppointmentDto.endTime,
     );
 
     if (conflicts) {
-      throw new BadRequestException('The selected time conflicts with another appointment');
+      throw new BadRequestException(
+        "The selected time conflicts with another appointment",
+      );
     }
 
     const appointment = new Appointment(
@@ -159,7 +175,7 @@ export class SchedulingService {
     );
 
     for (const student of students) {
-      (appointment.students as any).items.add(student);
+      appointment.students.add(student);
     }
 
     if (createAppointmentDto.notes) {
@@ -167,13 +183,13 @@ export class SchedulingService {
     }
 
     // Create Google Calendar event (non-blocking)
-    const studentNames = students.map(s => s.fullName).join(', ');
+    const studentNames = students.map((s) => s.fullName).join(", ");
     const calendarEventId = await this.googleCalendar.createEvent({
       summary: `Spanish Class: ${studentNames} with ${tutor.fullName}`,
       description: appointment.notes,
       startTime: appointment.startTime,
       endTime: appointment.endTime,
-      attendeeEmails: [...students.map(s => s.email), tutor.email],
+      attendeeEmails: [...students.map((s) => s.email), tutor.email],
     });
 
     if (calendarEventId) {
@@ -188,14 +204,17 @@ export class SchedulingService {
       appointment.confirmationEmailSent = true;
       await this.em.flush();
     } catch (error) {
-      this.logger.error('Failed to send confirmation email', error.stack);
+      this.logger.error("Failed to send confirmation email", error.stack);
       // Don't fail the appointment creation if email fails
     }
 
     return appointment;
   }
 
-  async updateAppointment(id: string, updateAppointmentDto: UpdateAppointmentDto) {
+  async updateAppointment(
+    id: string,
+    updateAppointmentDto: UpdateAppointmentDto,
+  ) {
     const appointment = await this.findAppointmentById(id);
 
     // If updating times, verify availability and conflicts
@@ -207,11 +226,13 @@ export class SchedulingService {
       const isAvailable = await this.checkTutorAvailability(
         appointment.tutor.id,
         startTime,
-        endTime
+        endTime,
       );
 
       if (!isAvailable) {
-        throw new BadRequestException('The selected time is not within the tutor\'s availability');
+        throw new BadRequestException(
+          "The selected time is not within the tutor's availability",
+        );
       }
 
       // Check for time conflicts (excluding this appointment)
@@ -219,27 +240,38 @@ export class SchedulingService {
         appointment.tutor.id,
         startTime,
         endTime,
-        id
+        id,
       );
 
       if (conflicts) {
-        throw new BadRequestException('The selected time conflicts with another appointment');
+        throw new BadRequestException(
+          "The selected time conflicts with another appointment",
+        );
       }
 
       // Update Google Calendar event if times are changing
       if (appointment.googleCalendarEventId) {
-        const studentNames = appointment.students.getItems().map(s => s.fullName).join(', ');
-        await this.googleCalendar.updateEvent(appointment.googleCalendarEventId, {
-          summary: `Spanish Class: ${studentNames} with ${appointment.tutor.fullName}`,
-          description: updateAppointmentDto.notes || appointment.notes,
-          startTime,
-          endTime,
-        });
+        const studentNames = appointment.students
+          .getItems()
+          .map((s) => s.fullName)
+          .join(", ");
+        await this.googleCalendar.updateEvent(
+          appointment.googleCalendarEventId,
+          {
+            summary: `Spanish Class: ${studentNames} with ${appointment.tutor.fullName}`,
+            description: updateAppointmentDto.notes || appointment.notes,
+            startTime,
+            endTime,
+          },
+        );
       }
     }
 
     // Cancel in Google Calendar if status is being set to cancelled
-    if (updateAppointmentDto.status === AppointmentStatus.CANCELLED && appointment.googleCalendarEventId) {
+    if (
+      updateAppointmentDto.status === AppointmentStatus.CANCELLED &&
+      appointment.googleCalendarEventId
+    ) {
       await this.googleCalendar.deleteEvent(appointment.googleCalendarEventId);
     }
 
@@ -250,11 +282,18 @@ export class SchedulingService {
 
   async cancelAppointment(id: string, dto: CancelAppointmentDto) {
     const appointment = await this.findAppointmentById(id);
+
+    if (appointment.status === AppointmentStatus.CANCELLED) {
+      throw new BadRequestException('Appointment is already cancelled');
+    }
+
     appointment.status = AppointmentStatus.CANCELLED;
     appointment.creditedBack = dto.creditHoursBack;
 
     if (dto.creditHoursBack) {
-      const durationHours = (appointment.endTime.getTime() - appointment.startTime.getTime()) / (1000 * 60 * 60);
+      const durationHours =
+        (appointment.endTime.getTime() - appointment.startTime.getTime()) /
+        (1000 * 60 * 60);
       const course = appointment.course;
       course.hoursBalance = Number(course.hoursBalance) + durationHours;
       if (course.hoursBalance > 0) {
@@ -273,7 +312,7 @@ export class SchedulingService {
     try {
       await this.emailService.sendClassCancellationEmail(appointment);
     } catch (error) {
-      this.logger.error('Failed to send cancellation email', error.stack);
+      this.logger.error("Failed to send cancellation email", error.stack);
       // Don't fail the appointment cancellation if email fails
     }
 
@@ -286,7 +325,10 @@ export class SchedulingService {
 
     // Update Google Calendar event to mark as completed
     if (appointment.googleCalendarEventId) {
-      const studentNames = appointment.students.getItems().map(s => s.fullName).join(', ');
+      const studentNames = appointment.students
+        .getItems()
+        .map((s) => s.fullName)
+        .join(", ");
       await this.googleCalendar.updateEvent(appointment.googleCalendarEventId, {
         summary: `Spanish Class: ${studentNames} with ${appointment.tutor.fullName} (Completed)`,
         description: appointment.notes,
@@ -301,9 +343,12 @@ export class SchedulingService {
 
   // Availability methods
   async findAvailabilityById(id: string) {
-    const availability = await this.availabilityRepository.findOne({ id }, {
-      populate: ['tutor'],
-    });
+    const availability = await this.availabilityRepository.findOne(
+      { id },
+      {
+        populate: ["tutor"],
+      },
+    );
 
     if (!availability) {
       throw new NotFoundException(`Availability with ID ${id} not found`);
@@ -316,12 +361,9 @@ export class SchedulingService {
     return this.availabilityRepository.find(
       { tutor: tutorId },
       {
-        populate: ['tutor'],
-        orderBy: [
-          { dayOfWeek: 'ASC' },
-          { startTime: 'ASC' },
-        ],
-      }
+        populate: ["tutor"],
+        orderBy: [{ dayOfWeek: "ASC" }, { startTime: "ASC" }],
+      },
     );
   }
 
@@ -332,7 +374,9 @@ export class SchedulingService {
     });
 
     if (!tutor) {
-      throw new NotFoundException(`Tutor with ID ${createAvailabilityDto.tutorId} not found`);
+      throw new NotFoundException(
+        `Tutor with ID ${createAvailabilityDto.tutorId} not found`,
+      );
     }
 
     const availability = new Availability(
@@ -340,15 +384,20 @@ export class SchedulingService {
       createAvailabilityDto.dayOfWeek,
       createAvailabilityDto.startTime,
       createAvailabilityDto.endTime,
-      createAvailabilityDto.isRecurring !== undefined ? createAvailabilityDto.isRecurring : true,
-      createAvailabilityDto.specificDate
+      createAvailabilityDto.isRecurring !== undefined
+        ? createAvailabilityDto.isRecurring
+        : true,
+      createAvailabilityDto.specificDate,
     );
 
     await this.em.persistAndFlush(availability);
     return availability;
   }
 
-  async updateAvailability(id: string, updateAvailabilityDto: UpdateAvailabilityDto) {
+  async updateAvailability(
+    id: string,
+    updateAvailabilityDto: UpdateAvailabilityDto,
+  ) {
     const availability = await this.findAvailabilityById(id);
     this.em.assign(availability, updateAvailabilityDto);
     await this.em.flush();
@@ -365,11 +414,11 @@ export class SchedulingService {
   private async checkTutorAvailability(
     tutorId: string,
     startTime: Date,
-    endTime: Date
+    endTime: Date,
   ): Promise<boolean> {
     const day = startTime.getDay();
-    const timeStart = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`;
-    const timeEnd = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}`;
+    const timeStart = `${startTime.getHours().toString().padStart(2, "0")}:${startTime.getMinutes().toString().padStart(2, "0")}`;
+    const timeEnd = `${endTime.getHours().toString().padStart(2, "0")}:${endTime.getMinutes().toString().padStart(2, "0")}`;
 
     // Check recurring availability
     const recurringAvailability = await this.availabilityRepository.findOne({
@@ -403,7 +452,7 @@ export class SchedulingService {
     tutorId: string,
     startTime: Date,
     endTime: Date,
-    excludeAppointmentId?: string
+    excludeAppointmentId?: string,
   ): Promise<boolean> {
     const query = {
       tutor: tutorId,
@@ -414,7 +463,10 @@ export class SchedulingService {
         // Case 2: New appointment contains an existing appointment
         { startTime: { $gte: startTime, $lt: endTime } },
         // Case 3: New appointment ends during an existing appointment
-        { startTime: { $lt: startTime }, endTime: { $gt: startTime, $lte: endTime } },
+        {
+          startTime: { $lt: startTime },
+          endTime: { $gt: startTime, $lte: endTime },
+        },
       ],
     };
 
@@ -422,7 +474,8 @@ export class SchedulingService {
       Object.assign(query, { id: { $ne: excludeAppointmentId } });
     }
 
-    const conflictingAppointments = await this.appointmentRepository.count(query);
+    const conflictingAppointments =
+      await this.appointmentRepository.count(query);
     return conflictingAppointments > 0;
   }
 
@@ -437,18 +490,19 @@ export class SchedulingService {
         status: AppointmentStatus.SCHEDULED,
       },
       {
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
         limit: 5,
-      }
+      },
     );
 
     // Get completed appointments this month
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const completedAppointmentsThisMonth = await this.appointmentRepository.count({
-      status: AppointmentStatus.COMPLETED,
-      startTime: { $gte: firstDayOfMonth, $lte: now },
-    });
+    const completedAppointmentsThisMonth =
+      await this.appointmentRepository.count({
+        status: AppointmentStatus.COMPLETED,
+        startTime: { $gte: firstDayOfMonth, $lte: now },
+      });
 
     // Get total hours taught (completed appointments)
     const completedAppointments = await this.appointmentRepository.find({
@@ -456,8 +510,10 @@ export class SchedulingService {
     });
 
     let totalHoursTaught = 0;
-    completedAppointments.forEach(appointment => {
-      const durationHours = (appointment.endTime.getTime() - appointment.startTime.getTime()) / (1000 * 60 * 60);
+    completedAppointments.forEach((appointment) => {
+      const durationHours =
+        (appointment.endTime.getTime() - appointment.startTime.getTime()) /
+        (1000 * 60 * 60);
       totalHoursTaught += durationHours;
     });
 
@@ -468,8 +524,10 @@ export class SchedulingService {
     });
 
     let totalScheduledHours = 0;
-    scheduledAppointments.forEach(appointment => {
-      const durationHours = (appointment.endTime.getTime() - appointment.startTime.getTime()) / (1000 * 60 * 60);
+    scheduledAppointments.forEach((appointment) => {
+      const durationHours =
+        (appointment.endTime.getTime() - appointment.startTime.getTime()) /
+        (1000 * 60 * 60);
       totalScheduledHours += durationHours;
     });
 
@@ -485,23 +543,33 @@ export class SchedulingService {
 
   // Attendance methods
   async createAttendance(createAttendanceDto: CreateAttendanceDto) {
-    const appointment = await this.appointmentRepository.findOne({ id: createAttendanceDto.appointmentId });
+    const appointment = await this.appointmentRepository.findOne({
+      id: createAttendanceDto.appointmentId,
+    });
     if (!appointment) {
-      throw new NotFoundException(`Appointment with ID ${createAttendanceDto.appointmentId} not found`);
+      throw new NotFoundException(
+        `Appointment with ID ${createAttendanceDto.appointmentId} not found`,
+      );
     }
 
     const student = await this.userRepository.findOne({
       id: createAttendanceDto.studentId,
-      role: UserRole.STUDENT
+      role: UserRole.STUDENT,
     });
     if (!student) {
-      throw new NotFoundException(`Student with ID ${createAttendanceDto.studentId} not found`);
+      throw new NotFoundException(
+        `Student with ID ${createAttendanceDto.studentId} not found`,
+      );
     }
 
     // Check if attendance already exists for this appointment
-    const existingAttendance = await this.attendanceRepository.findOne({ appointment });
+    const existingAttendance = await this.attendanceRepository.findOne({
+      appointment,
+    });
     if (existingAttendance) {
-      throw new BadRequestException('Attendance already recorded for this appointment');
+      throw new BadRequestException(
+        "Attendance already recorded for this appointment",
+      );
     }
 
     const attendance = new Attendance(
@@ -509,7 +577,7 @@ export class SchedulingService {
       student,
       createAttendanceDto.status,
       createAttendanceDto.notes,
-      createAttendanceDto.markedByTutor
+      createAttendanceDto.markedByTutor,
     );
 
     await this.em.persistAndFlush(attendance);
@@ -519,7 +587,7 @@ export class SchedulingService {
   async findAttendanceByAppointment(appointmentId: string) {
     return this.attendanceRepository.findOne(
       { appointment: appointmentId },
-      { populate: ['appointment', 'student'] }
+      { populate: ["appointment", "student"] },
     );
   }
 
@@ -527,9 +595,9 @@ export class SchedulingService {
     return this.attendanceRepository.find(
       { student: studentId },
       {
-        populate: ['appointment', 'student'],
-        orderBy: { createdAt: 'DESC' }
-      }
+        populate: ["appointment", "student"],
+        orderBy: { createdAt: "DESC" },
+      },
     );
   }
 
@@ -546,23 +614,33 @@ export class SchedulingService {
 
   // Class Report methods
   async createClassReport(createClassReportDto: CreateClassReportDto) {
-    const appointment = await this.appointmentRepository.findOne({ id: createClassReportDto.appointmentId });
+    const appointment = await this.appointmentRepository.findOne({
+      id: createClassReportDto.appointmentId,
+    });
     if (!appointment) {
-      throw new NotFoundException(`Appointment with ID ${createClassReportDto.appointmentId} not found`);
+      throw new NotFoundException(
+        `Appointment with ID ${createClassReportDto.appointmentId} not found`,
+      );
     }
 
     const tutor = await this.userRepository.findOne({
       id: createClassReportDto.tutorId,
-      role: UserRole.TUTOR
+      role: UserRole.TUTOR,
     });
     if (!tutor) {
-      throw new NotFoundException(`Tutor with ID ${createClassReportDto.tutorId} not found`);
+      throw new NotFoundException(
+        `Tutor with ID ${createClassReportDto.tutorId} not found`,
+      );
     }
 
     // Check if class report already exists for this appointment
-    const existingReport = await this.classReportRepository.findOne({ appointment });
+    const existingReport = await this.classReportRepository.findOne({
+      appointment,
+    });
     if (existingReport) {
-      throw new BadRequestException('Class report already exists for this appointment');
+      throw new BadRequestException(
+        "Class report already exists for this appointment",
+      );
     }
 
     const classReport = new ClassReport(
@@ -572,7 +650,7 @@ export class SchedulingService {
       createClassReportDto.content,
       createClassReportDto.homeworkAssigned,
       createClassReportDto.studentProgress,
-      createClassReportDto.nextLessonNotes
+      createClassReportDto.nextLessonNotes,
     );
 
     await this.em.persistAndFlush(classReport);
@@ -582,7 +660,7 @@ export class SchedulingService {
   async findClassReportByAppointment(appointmentId: string) {
     return this.classReportRepository.findOne(
       { appointment: appointmentId },
-      { populate: ['appointment', 'tutor'] }
+      { populate: ["appointment", "tutor"] },
     );
   }
 
@@ -590,13 +668,16 @@ export class SchedulingService {
     return this.classReportRepository.find(
       { tutor: tutorId },
       {
-        populate: ['appointment', 'tutor'],
-        orderBy: { createdAt: 'DESC' }
-      }
+        populate: ["appointment", "tutor"],
+        orderBy: { createdAt: "DESC" },
+      },
     );
   }
 
-  async updateClassReport(id: string, updateClassReportDto: UpdateClassReportDto) {
+  async updateClassReport(
+    id: string,
+    updateClassReportDto: UpdateClassReportDto,
+  ) {
     const classReport = await this.classReportRepository.findOne({ id });
     if (!classReport) {
       throw new NotFoundException(`Class report with ID ${id} not found`);
@@ -626,22 +707,32 @@ export class SchedulingService {
       totalAttendance,
       presentCount,
       absentCount,
-      onTimeCancellationCount
+      onTimeCancellationCount,
     ] = await Promise.all([
       this.attendanceRepository.count(criteria),
-      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.PRESENT }),
-      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.ABSENT }),
-      this.attendanceRepository.count({ ...criteria, status: AttendanceStatus.ON_TIME_CANCELLATION })
+      this.attendanceRepository.count({
+        ...criteria,
+        status: AttendanceStatus.PRESENT,
+      }),
+      this.attendanceRepository.count({
+        ...criteria,
+        status: AttendanceStatus.ABSENT,
+      }),
+      this.attendanceRepository.count({
+        ...criteria,
+        status: AttendanceStatus.ON_TIME_CANCELLATION,
+      }),
     ]);
 
-    const attendanceRate = totalAttendance > 0 ? (presentCount / totalAttendance) * 100 : 0;
+    const attendanceRate =
+      totalAttendance > 0 ? (presentCount / totalAttendance) * 100 : 0;
 
     return {
       totalAttendance,
       presentCount,
       absentCount,
       onTimeCancellationCount,
-      attendanceRate: Math.round(attendanceRate * 100) / 100
+      attendanceRate: Math.round(attendanceRate * 100) / 100,
     };
   }
 }
