@@ -1,19 +1,39 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsUUID, IsNumber, Min, Max } from 'class-validator';
-import { LearningLevel } from '../entities/course.entity';
+import { IsString, IsOptional, IsBoolean, IsUUID, IsNumber, IsDateString, IsArray, Min, Max, Matches, ValidateNested, ArrayMinSize } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ScheduleSlotDto {
+  @IsNumber()
+  @Min(0)
+  @Max(6)
+  dayOfWeek: number;
+
+  @Matches(/^\d{2}:\d{2}$/, { message: 'startTime must be in HH:MM format' })
+  startTime: string;
+
+  @Matches(/^\d{2}:\d{2}$/, { message: 'endTime must be in HH:MM format' })
+  endTime: string;
+}
 
 export class CreateCourseDto {
   @IsString()
   title: string;
 
-  @IsString()
-  description: string;
+  @IsUUID()
+  tutorId: string;
 
-  @IsEnum(LearningLevel)
-  learningLevel: LearningLevel;
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  @ArrayMinSize(1)
+  studentIds: string[];
 
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  @IsDateString()
+  startDate: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScheduleSlotDto)
+  @ArrayMinSize(1)
+  schedules: ScheduleSlotDto[];
 }
 
 export class UpdateCourseDto {
@@ -22,62 +42,34 @@ export class UpdateCourseDto {
   title?: string;
 
   @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsEnum(LearningLevel)
-  learningLevel?: LearningLevel;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
 
-export class CreateLessonDto {
-  @IsUUID()
-  courseId: string;
-
-  @IsString()
-  title: string;
-
-  @IsString()
-  content: string;
-
-  @IsNumber()
-  @Min(0)
-  order: number;
-}
-
-export class UpdateLessonDto {
-  @IsOptional()
-  @IsString()
-  title?: string;
-
-  @IsOptional()
-  @IsString()
-  content?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  order?: number;
-}
-
-export class AssignCourseDto {
-  @IsUUID()
-  courseId: string;
-
+export class AddStudentDto {
   @IsUUID()
   studentId: string;
-
-  @IsUUID()
-  tutorId: string;
 }
 
-export class UpdateProgressDto {
+export class RemoveStudentDto {
+  @IsUUID()
+  studentId: string;
+}
+
+export class AddScheduleDto {
   @IsNumber()
   @Min(0)
-  @Max(100)
-  progress: number;
+  @Max(6)
+  dayOfWeek: number;
+
+  @Matches(/^\d{2}:\d{2}$/, { message: 'startTime must be in HH:MM format' })
+  startTime: string;
+
+  @Matches(/^\d{2}:\d{2}$/, { message: 'endTime must be in HH:MM format' })
+  endTime: string;
+}
+
+export class AdjustHoursDto {
+  @IsNumber()
+  hours: number;
 }
