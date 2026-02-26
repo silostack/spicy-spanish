@@ -17,6 +17,7 @@ import { UserRole } from '../users/entities/user.entity';
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
+  CancelAppointmentDto,
   CreateAvailabilityDto,
   UpdateAvailabilityDto,
   CreateAttendanceDto,
@@ -76,8 +77,8 @@ export class SchedulingController {
   }
 
   @Patch('appointments/:id/cancel')
-  async cancelAppointment(@Param('id') id: string) {
-    return this.schedulingService.cancelAppointment(id);
+  async cancelAppointment(@Param('id') id: string, @Body() dto: CancelAppointmentDto) {
+    return this.schedulingService.cancelAppointment(id, dto);
   }
 
   @Patch('appointments/:id/complete')
