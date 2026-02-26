@@ -112,7 +112,8 @@ export class EmailService {
   }
 
   async sendClassReminder(appointment: Appointment): Promise<void> {
-    const student = appointment.student;
+    const students = appointment.students.getItems();
+    const student = students[0];
     const tutor = appointment.tutor;
     
     const template = `
@@ -183,7 +184,8 @@ export class EmailService {
   }
 
   async sendClassConfirmationEmail(appointment: Appointment): Promise<void> {
-    const student = appointment.student;
+    const students = appointment.students.getItems();
+    const student = students[0];
     const tutor = appointment.tutor;
     
     const template = `
@@ -258,7 +260,8 @@ export class EmailService {
   }
 
   async sendClassCancellationEmail(appointment: Appointment): Promise<void> {
-    const student = appointment.student;
+    const students = appointment.students.getItems();
+    const student = students[0];
     const tutor = appointment.tutor;
     
     const template = `
@@ -370,7 +373,7 @@ export class EmailService {
       status: AppointmentStatus.SCHEDULED,
       reminderSent: false,
     }, {
-      populate: ['student', 'tutor'],
+      populate: ['students', 'tutor'],
     });
   }
 
@@ -381,7 +384,7 @@ export class EmailService {
       status: AppointmentStatus.SCHEDULED,
       dayBeforeReminderSent: false,
     }, {
-      populate: ['student', 'tutor'],
+      populate: ['students', 'tutor'],
     });
   }
   
@@ -433,7 +436,8 @@ export class EmailService {
   }
 
   async sendDayBeforeReminder(appointment: Appointment): Promise<void> {
-    const student = appointment.student;
+    const students = appointment.students.getItems();
+    const student = students[0];
     const tutor = appointment.tutor;
     
     const template = `
