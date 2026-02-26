@@ -8,12 +8,12 @@ type AttendanceStatus = 'present' | 'absent' | 'on_time_cancellation';
 
 interface Appointment {
   id: string;
-  student: {
+  students: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
+  }[];
   tutor: {
     id: string;
     firstName: string;
@@ -119,7 +119,7 @@ const AttendancePage = () => {
         // Create new attendance record
         const response = await api.post('/scheduling/attendance', {
           appointmentId,
-          studentId: appointment.student.id,
+          studentId: appointment.students[0]?.id,
           status,
           notes,
           markedByTutor: user?.role === 'tutor',
@@ -285,7 +285,7 @@ const AttendancePage = () => {
                             {formatDateTime(appointment.startTime)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {appointment.student.firstName} {appointment.student.lastName}
+                            {appointment.students[0]?.firstName} {appointment.students[0]?.lastName}
                           </td>
                           {user?.role === 'admin' && (
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

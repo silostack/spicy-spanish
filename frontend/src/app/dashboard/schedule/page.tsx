@@ -180,7 +180,7 @@ export default function SchedulePage() {
   const handleCancelAppointmentClick = async (appointmentId: string) => {
     if (window.confirm('Are you sure you want to cancel this appointment?')) {
       try {
-        await cancelAppointment(appointmentId);
+        await cancelAppointment(appointmentId, false);
         
         if (showAppointmentDetails) {
           setShowAppointmentDetails(false);
@@ -346,7 +346,7 @@ export default function SchedulePage() {
                     </td>
                     {(user?.role === 'admin' || user?.role === 'tutor') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {appointment.student.firstName} {appointment.student.lastName}
+                        {appointment.students[0]?.firstName} {appointment.students[0]?.lastName}
                       </td>
                     )}
                     {(user?.role === 'admin' || user?.role === 'student') && (
@@ -355,10 +355,7 @@ export default function SchedulePage() {
                       </td>
                     )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {appointment.course ? 
-                        `${appointment.course.title} (${appointment.course.learningLevel.charAt(0).toUpperCase() + appointment.course.learningLevel.slice(1)})` 
-                        : 'No course assigned'
-                      }
+                      {appointment.course.title}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {calculateDuration(appointment.startTime, appointment.endTime)}
@@ -387,8 +384,8 @@ export default function SchedulePage() {
         ) : (
           <div className="text-center py-8">
             <p className="text-gray-600 mb-4">
-              {user?.role === 'student' 
-                ? "You don't have any upcoming lessons scheduled." 
+              {user?.role === 'student'
+                ? "You don't have any upcoming lessons scheduled."
                 : user?.role === 'tutor'
                 ? "You don't have any upcoming lessons scheduled."
                 : "There are no upcoming lessons scheduled."}
@@ -409,7 +406,7 @@ export default function SchedulePage() {
       {pastAppointments.length > 0 && (
         <div className="bg-white rounded-xl shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4 text-spicy-dark">Past Lessons</h2>
-          
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -446,7 +443,7 @@ export default function SchedulePage() {
                     </td>
                     {(user?.role === 'admin' || user?.role === 'tutor') && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {appointment.student.firstName} {appointment.student.lastName}
+                        {appointment.students[0]?.firstName} {appointment.students[0]?.lastName}
                       </td>
                     )}
                     {(user?.role === 'admin' || user?.role === 'student') && (
@@ -647,9 +644,9 @@ export default function SchedulePage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Student</h3>
                   <p className="text-base font-medium">
-                    {selectedAppointment.student.firstName} {selectedAppointment.student.lastName}
+                    {selectedAppointment.students?.[0]?.firstName} {selectedAppointment.students?.[0]?.lastName}
                   </p>
-                  <p className="text-sm text-gray-600">{selectedAppointment.student.email}</p>
+                  <p className="text-sm text-gray-600">{selectedAppointment.students?.[0]?.email}</p>
                 </div>
                 
                 <div>

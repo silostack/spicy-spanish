@@ -9,35 +9,35 @@ import { useAuth } from '../../contexts/AuthContext';
 const MOCK_APPOINTMENTS = [
   {
     id: '1',
-    student: { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+    students: [{ id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' }],
     startTime: new Date(2025, 3, 17, 10, 0),
     endTime: new Date(2025, 3, 17, 11, 0),
     status: 'scheduled',
   },
   {
     id: '2',
-    student: { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' },
+    students: [{ id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' }],
     startTime: new Date(2025, 3, 18, 14, 30),
     endTime: new Date(2025, 3, 18, 15, 30),
     status: 'scheduled',
   },
   {
     id: '3',
-    student: { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' },
+    students: [{ id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com' }],
     startTime: new Date(2025, 3, 15, 15, 0),
     endTime: new Date(2025, 3, 15, 16, 0),
     status: 'completed',
   },
   {
     id: '4',
-    student: { id: '3', firstName: 'Michael', lastName: 'Johnson', email: 'michael@example.com' },
+    students: [{ id: '3', firstName: 'Michael', lastName: 'Johnson', email: 'michael@example.com' }],
     startTime: new Date(2025, 3, 14, 11, 0),
     endTime: new Date(2025, 3, 14, 12, 30),
     status: 'completed',
   },
   {
     id: '5',
-    student: { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' },
+    students: [{ id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com' }],
     startTime: new Date(2025, 3, 20, 9, 0),
     endTime: new Date(2025, 3, 20, 10, 0),
     status: 'scheduled',
@@ -106,7 +106,7 @@ export default function TutorDashboard() {
     const totalEarned = totalHours * hourlyRate;
 
     // Calculate total unique students
-    const uniqueStudentIds = new Set(appointments.map(appointment => appointment.student.id));
+    const uniqueStudentIds = new Set(appointments.flatMap(appointment => appointment.students.map(s => s.id)));
 
     // Count upcoming appointments
     const now = new Date();
@@ -273,7 +273,7 @@ export default function TutorDashboard() {
                           : 'bg-blue-100 text-blue-800'
                       }`}
                     >
-                      {format(new Date(appointment.startTime), 'h:mm a')}: {appointment.student.firstName}
+                      {format(new Date(appointment.startTime), 'h:mm a')}: {appointment.students[0]?.firstName}
                     </div>
                   ))}
                   
@@ -362,7 +362,7 @@ export default function TutorDashboard() {
                         {format(startTime, 'EEE, MMM d, yyyy')} at {format(startTime, 'h:mm a')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {appointment.student.firstName} {appointment.student.lastName}
+                        {appointment.students[0]?.firstName} {appointment.students[0]?.lastName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {durationMinutes} minutes
@@ -416,23 +416,23 @@ export default function TutorDashboard() {
         
         {/* Extract unique students from appointments */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from(new Set(appointments.map(a => a.student.id)))
+          {Array.from(new Set(appointments.flatMap(a => a.students.map(s => s.id))))
             .slice(0, 6) // Show up to 6 students
             .map((studentId) => {
-              const student = appointments.find(
-                (a) => a.student.id === studentId
-              )?.student;
+              const student = appointments
+                .flatMap(a => a.students)
+                .find(s => s.id === studentId);
 
               if (!student) return null;
 
               // Calculate how many sessions were completed with this student
               const completedSessions = appointments.filter(
-                (a) => a.student.id === studentId && a.status === 'completed'
+                (a) => a.students.some(s => s.id === studentId) && a.status === 'completed'
               ).length;
-              
+
               // Calculate total hours with this student
               const totalHoursWithStudent = appointments
-                .filter((a) => a.student.id === studentId && a.status === 'completed')
+                .filter((a) => a.students.some(s => s.id === studentId) && a.status === 'completed')
                 .reduce((total, appointment) => {
                   const start = new Date(appointment.startTime);
                   const end = new Date(appointment.endTime);

@@ -33,19 +33,19 @@ interface Course {
 
 interface Appointment {
   id: string;
-  student: {
+  students: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
+  }[];
   tutor: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
   };
-  course?: Course;
+  course: Course;
   startTime: string;
   endTime: string;
   status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
@@ -73,7 +73,7 @@ interface SchedulingContextType {
   selectTimeSlot: (timeSlot: { start: string; end: string }) => void;
   selectCourse: (course: Course | null) => void;
   bookAppointment: (notes?: string) => Promise<void>;
-  cancelAppointment: (appointmentId: string) => Promise<void>;
+  cancelAppointment: (appointmentId: string, creditHoursBack: boolean) => Promise<void>;
 }
 
 const SchedulingContext = createContext<SchedulingContextType | undefined>(undefined);
@@ -266,14 +266,14 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  const cancelAppointment = async (appointmentId: string) => {
+  const cancelAppointment = async (appointmentId: string, creditHoursBack: boolean) => {
     if (!token) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      await api.patch(`/scheduling/appointments/${appointmentId}/cancel`, {}, {
+
+      await api.patch(`/scheduling/appointments/${appointmentId}/cancel`, { creditHoursBack }, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

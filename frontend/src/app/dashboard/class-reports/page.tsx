@@ -6,12 +6,12 @@ import api from '../../utils/api';
 
 interface Appointment {
   id: string;
-  student: {
+  students: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-  };
+  }[];
   tutor: {
     id: string;
     firstName: string;
@@ -244,7 +244,7 @@ const ClassReportsPage = () => {
                           {formatDateTime(appointment.startTime)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {appointment.student.firstName} {appointment.student.lastName}
+                          {appointment.students[0]?.firstName} {appointment.students[0]?.lastName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {appointment.course ? 
@@ -295,7 +295,7 @@ const ClassReportsPage = () => {
             <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
               <div className="mt-3">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Class Report - {selectedAppointment.student.firstName} {selectedAppointment.student.lastName}
+                  Class Report - {selectedAppointment.students[0]?.firstName} {selectedAppointment.students[0]?.lastName}
                 </h3>
                 <p className="text-sm text-gray-600 mb-6">
                   {formatDateTime(selectedAppointment.startTime)} | {selectedAppointment.course?.title || 'No course assigned'}
