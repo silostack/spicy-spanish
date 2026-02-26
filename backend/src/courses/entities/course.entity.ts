@@ -1,6 +1,7 @@
 import { Entity, ManyToOne, ManyToMany, PrimaryKey, Property, Collection, OneToMany } from '@mikro-orm/core';
 import { v4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
+import { CourseSchedule } from './course-schedule.entity';
 
 @Entity()
 export class Course {
@@ -27,6 +28,9 @@ export class Course {
 
   @Property({ default: false })
   needsRenewal: boolean = false;
+
+  @OneToMany(() => CourseSchedule, schedule => schedule.course, { orphanRemoval: true })
+  schedules = new Collection<CourseSchedule>(this);
 
   @Property()
   createdAt: Date = new Date();
