@@ -1,10 +1,12 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsUUID, IsNumber, IsDateString, Min, Max, Matches } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsBoolean, IsUUID, IsNumber, IsDateString, Min, Max, Matches, IsArray, ArrayMinSize } from 'class-validator';
 import { AppointmentStatus } from '../entities/appointment.entity';
 import { AttendanceStatus } from '../entities/attendance.entity';
 
 export class CreateAppointmentDto {
-  @IsUUID()
-  studentId: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID(undefined, { each: true })
+  studentIds: string[];
 
   @IsUUID()
   tutorId: string;
@@ -15,9 +17,8 @@ export class CreateAppointmentDto {
   @IsDateString()
   endTime: Date;
 
-  @IsOptional()
   @IsUUID()
-  courseId?: string;
+  courseId: string;
 
   @IsOptional()
   @IsString()
@@ -38,12 +39,13 @@ export class UpdateAppointmentDto {
   status?: AppointmentStatus;
 
   @IsOptional()
-  @IsUUID()
-  courseId?: string;
-
-  @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class CancelAppointmentDto {
+  @IsBoolean()
+  creditHoursBack: boolean;
 }
 
 export class CreateAvailabilityDto {
