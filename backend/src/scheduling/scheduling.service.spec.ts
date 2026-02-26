@@ -1,16 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@mikro-orm/nestjs';
-import { EntityManager } from '@mikro-orm/core';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { SchedulingService } from './scheduling.service';
-import { GoogleCalendarService } from './google-calendar.service';
-import { EmailService } from '../email/email.service';
-import { Appointment, AppointmentStatus } from './entities/appointment.entity';
-import { Availability } from './entities/availability.entity';
-import { Attendance, AttendanceStatus } from './entities/attendance.entity';
-import { ClassReport } from './entities/class-report.entity';
-import { User, UserRole } from '../users/entities/user.entity';
-import { Course } from '../courses/entities/course.entity';
+import { Test, TestingModule } from "@nestjs/testing";
+import { getRepositoryToken } from "@mikro-orm/nestjs";
+import { EntityManager } from "@mikro-orm/core";
+import { NotFoundException, BadRequestException } from "@nestjs/common";
+import { SchedulingService } from "./scheduling.service";
+import { GoogleCalendarService } from "./google-calendar.service";
+import { EmailService } from "../email/email.service";
+import { Appointment, AppointmentStatus } from "./entities/appointment.entity";
+import { Availability } from "./entities/availability.entity";
+import { Attendance, AttendanceStatus } from "./entities/attendance.entity";
+import { ClassReport } from "./entities/class-report.entity";
+import { User, UserRole } from "../users/entities/user.entity";
+import { Course } from "../courses/entities/course.entity";
 
 // ---------------------------------------------------------------------------
 // Helpers to build mock entities
@@ -18,12 +18,12 @@ import { Course } from '../courses/entities/course.entity';
 
 function createMockUser(overrides: Partial<User> & { role: UserRole }): User {
   const u = {
-    id: 'user-' + Math.random().toString(36).slice(2, 8),
-    firstName: 'Test',
-    lastName: 'User',
-    email: 'test@example.com',
-    password: 'hashed',
-    fullName: 'Test User',
+    id: "user-" + Math.random().toString(36).slice(2, 8),
+    firstName: "Test",
+    lastName: "User",
+    email: "test@example.com",
+    password: "hashed",
+    fullName: "Test User",
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -36,15 +36,25 @@ function createMockUser(overrides: Partial<User> & { role: UserRole }): User {
 }
 
 function createMockAppointment(overrides?: Partial<any>): any {
-  const student = createMockUser({ role: UserRole.STUDENT, firstName: 'Stu', lastName: 'Dent', email: 'stu@test.com' });
-  const tutor = createMockUser({ role: UserRole.TUTOR, firstName: 'Tu', lastName: 'Tor', email: 'tut@test.com' });
+  const student = createMockUser({
+    role: UserRole.STUDENT,
+    firstName: "Stu",
+    lastName: "Dent",
+    email: "stu@test.com",
+  });
+  const tutor = createMockUser({
+    role: UserRole.TUTOR,
+    firstName: "Tu",
+    lastName: "Tor",
+    email: "tut@test.com",
+  });
   const course = {
-    id: 'course-1',
+    id: "course-1",
     hoursBalance: 5,
     needsRenewal: false,
   };
   return {
-    id: 'appt-1',
+    id: "appt-1",
     students: {
       getItems: () => [student],
       add: jest.fn(),
@@ -52,8 +62,8 @@ function createMockAppointment(overrides?: Partial<any>): any {
     },
     tutor,
     course,
-    startTime: new Date('2026-03-01T10:00:00Z'),
-    endTime: new Date('2026-03-01T11:00:00Z'),
+    startTime: new Date("2026-03-01T10:00:00Z"),
+    endTime: new Date("2026-03-01T11:00:00Z"),
     status: AppointmentStatus.SCHEDULED,
     notes: undefined,
     creditedBack: undefined,
@@ -87,7 +97,7 @@ const mockEntityManager = () => ({
 });
 
 const mockGoogleCalendarService = () => ({
-  createEvent: jest.fn().mockResolvedValue('gcal-event-123'),
+  createEvent: jest.fn().mockResolvedValue("gcal-event-123"),
   updateEvent: jest.fn().mockResolvedValue(true),
   deleteEvent: jest.fn().mockResolvedValue(true),
   isEnabled: jest.fn().mockReturnValue(true),
@@ -102,7 +112,7 @@ const mockEmailService = () => ({
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('SchedulingService', () => {
+describe("SchedulingService", () => {
   let service: SchedulingService;
   let appointmentRepo: ReturnType<typeof mockRepository>;
   let availabilityRepo: ReturnType<typeof mockRepository>;
@@ -129,7 +139,10 @@ describe('SchedulingService', () => {
       providers: [
         SchedulingService,
         { provide: getRepositoryToken(Appointment), useValue: appointmentRepo },
-        { provide: getRepositoryToken(Availability), useValue: availabilityRepo },
+        {
+          provide: getRepositoryToken(Availability),
+          useValue: availabilityRepo,
+        },
         { provide: getRepositoryToken(Attendance), useValue: attendanceRepo },
         { provide: getRepositoryToken(ClassReport), useValue: classReportRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
@@ -143,7 +156,7 @@ describe('SchedulingService', () => {
     service = module.get<SchedulingService>(SchedulingService);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 
@@ -151,103 +164,123 @@ describe('SchedulingService', () => {
   // Appointment CRUD
   // -----------------------------------------------------------------------
 
-  describe('findAllAppointments', () => {
-    it('should return all appointments', async () => {
+  describe("findAllAppointments", () => {
+    it("should return all appointments", async () => {
       const appointments = [createMockAppointment()];
       appointmentRepo.findAll.mockResolvedValue(appointments);
 
       const result = await service.findAllAppointments();
       expect(result).toEqual(appointments);
       expect(appointmentRepo.findAll).toHaveBeenCalledWith({
-        populate: ['students', 'tutor', 'course'],
-        orderBy: { startTime: 'ASC' },
+        populate: ["students", "tutor", "course"],
+        orderBy: { startTime: "ASC" },
       });
     });
   });
 
-  describe('findAppointmentById', () => {
-    it('should return appointment when found', async () => {
+  describe("findAppointmentById", () => {
+    it("should return appointment when found", async () => {
       const appt = createMockAppointment();
       appointmentRepo.findOne.mockResolvedValue(appt);
 
-      const result = await service.findAppointmentById('appt-1');
+      const result = await service.findAppointmentById("appt-1");
       expect(result).toEqual(appt);
     });
 
-    it('should throw NotFoundException when not found', async () => {
+    it("should throw NotFoundException when not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(null);
-      await expect(service.findAppointmentById('bad-id')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('findAppointmentsByStudent', () => {
-    it('should query by student id through ManyToMany', async () => {
-      appointmentRepo.find.mockResolvedValue([]);
-      await service.findAppointmentsByStudent('stu-1');
-      expect(appointmentRepo.find).toHaveBeenCalledWith(
-        { students: 'stu-1' },
-        expect.objectContaining({ populate: ['students', 'tutor', 'course'] }),
+      await expect(service.findAppointmentById("bad-id")).rejects.toThrow(
+        NotFoundException,
       );
     });
   });
 
-  describe('findAppointmentsByTutor', () => {
-    it('should query by tutor id', async () => {
+  describe("findAppointmentsByStudent", () => {
+    it("should query by student id through ManyToMany", async () => {
       appointmentRepo.find.mockResolvedValue([]);
-      await service.findAppointmentsByTutor('tut-1');
+      await service.findAppointmentsByStudent("stu-1");
       expect(appointmentRepo.find).toHaveBeenCalledWith(
-        { tutor: 'tut-1' },
-        expect.objectContaining({ populate: ['students', 'tutor', 'course'] }),
+        { students: "stu-1" },
+        expect.objectContaining({ populate: ["students", "tutor", "course"] }),
       );
     });
   });
 
-  describe('findUpcomingAppointmentsByStudent', () => {
-    it('should filter by future scheduled appointments through ManyToMany', async () => {
+  describe("findAppointmentsByTutor", () => {
+    it("should query by tutor id", async () => {
       appointmentRepo.find.mockResolvedValue([]);
-      await service.findUpcomingAppointmentsByStudent('stu-1');
+      await service.findAppointmentsByTutor("tut-1");
       expect(appointmentRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          students: 'stu-1',
-          status: AppointmentStatus.SCHEDULED,
-        }),
-        expect.objectContaining({ orderBy: { startTime: 'ASC' } }),
+        { tutor: "tut-1" },
+        expect.objectContaining({ populate: ["students", "tutor", "course"] }),
       );
     });
   });
 
-  describe('findUpcomingAppointmentsByTutor', () => {
-    it('should filter by future scheduled appointments for tutor', async () => {
+  describe("findUpcomingAppointmentsByStudent", () => {
+    it("should filter by future scheduled appointments through ManyToMany", async () => {
       appointmentRepo.find.mockResolvedValue([]);
-      await service.findUpcomingAppointmentsByTutor('tut-1');
+      await service.findUpcomingAppointmentsByStudent("stu-1");
       expect(appointmentRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          tutor: 'tut-1',
+          students: "stu-1",
           status: AppointmentStatus.SCHEDULED,
         }),
-        expect.objectContaining({ orderBy: { startTime: 'ASC' } }),
+        expect.objectContaining({ orderBy: { startTime: "ASC" } }),
       );
     });
   });
 
-  describe('createAppointment', () => {
-    const student = createMockUser({ id: 'stu-1', role: UserRole.STUDENT, firstName: 'Stu', lastName: 'Dent', email: 'stu@test.com' });
-    const tutor = createMockUser({ id: 'tut-1', role: UserRole.TUTOR, firstName: 'Tu', lastName: 'Tor', email: 'tut@test.com' });
-    const mockCourse = { id: 'course-1', hoursBalance: 10, needsRenewal: false };
+  describe("findUpcomingAppointmentsByTutor", () => {
+    it("should filter by future scheduled appointments for tutor", async () => {
+      appointmentRepo.find.mockResolvedValue([]);
+      await service.findUpcomingAppointmentsByTutor("tut-1");
+      expect(appointmentRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tutor: "tut-1",
+          status: AppointmentStatus.SCHEDULED,
+        }),
+        expect.objectContaining({ orderBy: { startTime: "ASC" } }),
+      );
+    });
+  });
+
+  describe("createAppointment", () => {
+    const student = createMockUser({
+      id: "stu-1",
+      role: UserRole.STUDENT,
+      firstName: "Stu",
+      lastName: "Dent",
+      email: "stu@test.com",
+    });
+    const tutor = createMockUser({
+      id: "tut-1",
+      role: UserRole.TUTOR,
+      firstName: "Tu",
+      lastName: "Tor",
+      email: "tut@test.com",
+    });
+    const mockCourse = {
+      id: "course-1",
+      hoursBalance: 10,
+      needsRenewal: false,
+    };
 
     const dto = {
-      studentIds: ['stu-1'],
-      tutorId: 'tut-1',
-      courseId: 'course-1',
-      startTime: new Date('2026-03-01T10:00:00Z'),
-      endTime: new Date('2026-03-01T11:00:00Z'),
-      notes: 'Test lesson',
+      studentIds: ["stu-1"],
+      tutorId: "tut-1",
+      courseId: "course-1",
+      startTime: new Date("2026-03-01T10:00:00Z"),
+      endTime: new Date("2026-03-01T11:00:00Z"),
+      notes: "Test lesson",
     };
 
     beforeEach(() => {
       userRepo.findOne.mockImplementation(async (criteria) => {
-        if (criteria.id === 'stu-1' && criteria.role === UserRole.STUDENT) return student;
-        if (criteria.id === 'tut-1' && criteria.role === UserRole.TUTOR) return tutor;
+        if (criteria.id === "stu-1" && criteria.role === UserRole.STUDENT)
+          return student;
+        if (criteria.id === "tut-1" && criteria.role === UserRole.TUTOR)
+          return tutor;
         return null;
       });
       courseRepo.findOne.mockResolvedValue(mockCourse);
@@ -255,15 +288,15 @@ describe('SchedulingService', () => {
       appointmentRepo.count.mockResolvedValue(0);
     });
 
-    it('should create an appointment with google calendar event', async () => {
+    it("should create an appointment with google calendar event", async () => {
       const result = await service.createAppointment(dto);
 
       expect(result).toBeDefined();
       expect(result.tutor).toEqual(tutor);
-      expect(result.googleCalendarEventId).toBe('gcal-event-123');
+      expect(result.googleCalendarEventId).toBe("gcal-event-123");
       expect(googleCalendar.createEvent).toHaveBeenCalledWith(
         expect.objectContaining({
-          summary: expect.stringContaining('Stu Dent'),
+          summary: expect.stringContaining("Stu Dent"),
           startTime: dto.startTime,
           endTime: dto.endTime,
         }),
@@ -272,119 +305,150 @@ describe('SchedulingService', () => {
       expect(emailService.sendClassConfirmationEmail).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if student not found', async () => {
+    it("should throw NotFoundException if student not found", async () => {
       userRepo.findOne.mockResolvedValue(null);
-      await expect(service.createAppointment(dto)).rejects.toThrow(NotFoundException);
+      await expect(service.createAppointment(dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw NotFoundException if tutor not found', async () => {
+    it("should throw NotFoundException if tutor not found", async () => {
       userRepo.findOne.mockImplementation(async (criteria) => {
         if (criteria.role === UserRole.STUDENT) return student;
         return null;
       });
-      await expect(service.createAppointment(dto)).rejects.toThrow(NotFoundException);
+      await expect(service.createAppointment(dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw NotFoundException when course not found', async () => {
+    it("should throw NotFoundException when course not found", async () => {
       courseRepo.findOne.mockResolvedValue(null);
-      await expect(service.createAppointment(dto)).rejects.toThrow(NotFoundException);
+      await expect(service.createAppointment(dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw BadRequestException on time conflict', async () => {
+    it("should throw BadRequestException on time conflict", async () => {
       appointmentRepo.count.mockResolvedValue(1);
-      await expect(service.createAppointment(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.createAppointment(dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
-    it('should not fail appointment creation when email fails', async () => {
-      emailService.sendClassConfirmationEmail.mockRejectedValue(new Error('SMTP down'));
+    it("should not fail appointment creation when email fails", async () => {
+      emailService.sendClassConfirmationEmail.mockRejectedValue(
+        new Error("SMTP down"),
+      );
       const result = await service.createAppointment(dto);
       expect(result).toBeDefined();
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
   });
 
-  describe('updateAppointment', () => {
-    it('should update simple fields', async () => {
+  describe("updateAppointment", () => {
+    it("should update simple fields", async () => {
       const appt = createMockAppointment();
       appointmentRepo.findOne.mockResolvedValue(appt);
 
-      const result = await service.updateAppointment('appt-1', { notes: 'updated' });
-      expect(em.assign).toHaveBeenCalledWith(appt, { notes: 'updated' });
+      await service.updateAppointment("appt-1", {
+        notes: "updated",
+      });
+      expect(em.assign).toHaveBeenCalledWith(appt, { notes: "updated" });
       expect(em.flush).toHaveBeenCalled();
     });
 
-    it('should check availability and conflicts when times change', async () => {
-      const appt = createMockAppointment({ googleCalendarEventId: 'gcal-1' });
+    it("should check availability and conflicts when times change", async () => {
+      const appt = createMockAppointment({ googleCalendarEventId: "gcal-1" });
       appointmentRepo.findOne.mockResolvedValue(appt);
-      availabilityRepo.findOne.mockResolvedValue({ id: 'avail-1' });
+      availabilityRepo.findOne.mockResolvedValue({ id: "avail-1" });
       appointmentRepo.count.mockResolvedValue(0);
 
-      const newStart = new Date('2026-03-01T12:00:00Z');
-      await service.updateAppointment('appt-1', { startTime: newStart });
+      const newStart = new Date("2026-03-01T12:00:00Z");
+      await service.updateAppointment("appt-1", { startTime: newStart });
 
-      expect(googleCalendar.updateEvent).toHaveBeenCalledWith('gcal-1', expect.anything());
+      expect(googleCalendar.updateEvent).toHaveBeenCalledWith(
+        "gcal-1",
+        expect.anything(),
+      );
       expect(em.flush).toHaveBeenCalled();
     });
 
-    it('should delete google calendar event when status set to cancelled', async () => {
-      const appt = createMockAppointment({ googleCalendarEventId: 'gcal-1' });
+    it("should delete google calendar event when status set to cancelled", async () => {
+      const appt = createMockAppointment({ googleCalendarEventId: "gcal-1" });
       appointmentRepo.findOne.mockResolvedValue(appt);
 
-      await service.updateAppointment('appt-1', { status: AppointmentStatus.CANCELLED });
-      expect(googleCalendar.deleteEvent).toHaveBeenCalledWith('gcal-1');
+      await service.updateAppointment("appt-1", {
+        status: AppointmentStatus.CANCELLED,
+      });
+      expect(googleCalendar.deleteEvent).toHaveBeenCalledWith("gcal-1");
     });
 
-    it('should throw BadRequestException when new time is unavailable', async () => {
+    it("should throw BadRequestException when new time is unavailable", async () => {
       const appt = createMockAppointment();
       appointmentRepo.findOne.mockResolvedValue(appt);
       availabilityRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.updateAppointment('appt-1', { startTime: new Date('2026-03-01T14:00:00Z') }),
+        service.updateAppointment("appt-1", {
+          startTime: new Date("2026-03-01T14:00:00Z"),
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('cancelAppointment', () => {
-    it('should set status to CANCELLED and delete calendar event', async () => {
-      const appt = createMockAppointment({ googleCalendarEventId: 'gcal-1' });
+  describe("cancelAppointment", () => {
+    it("should set status to CANCELLED and delete calendar event", async () => {
+      const appt = createMockAppointment({ googleCalendarEventId: "gcal-1" });
       appointmentRepo.findOne.mockResolvedValue(appt);
 
-      const result = await service.cancelAppointment('appt-1', { creditHoursBack: false });
+      const result = await service.cancelAppointment("appt-1", {
+        creditHoursBack: false,
+      });
       expect(result.status).toBe(AppointmentStatus.CANCELLED);
-      expect(googleCalendar.deleteEvent).toHaveBeenCalledWith('gcal-1');
-      expect(emailService.sendClassCancellationEmail).toHaveBeenCalledWith(appt);
+      expect(googleCalendar.deleteEvent).toHaveBeenCalledWith("gcal-1");
+      expect(emailService.sendClassCancellationEmail).toHaveBeenCalledWith(
+        appt,
+      );
     });
 
-    it('should not fail if cancellation email fails', async () => {
+    it("should not fail if cancellation email fails", async () => {
       const appt = createMockAppointment();
       appointmentRepo.findOne.mockResolvedValue(appt);
-      emailService.sendClassCancellationEmail.mockRejectedValue(new Error('email fail'));
+      emailService.sendClassCancellationEmail.mockRejectedValue(
+        new Error("email fail"),
+      );
 
-      const result = await service.cancelAppointment('appt-1', { creditHoursBack: false });
+      const result = await service.cancelAppointment("appt-1", {
+        creditHoursBack: false,
+      });
       expect(result.status).toBe(AppointmentStatus.CANCELLED);
     });
 
-    it('should cancel and credit hours back to course when creditHoursBack is true', async () => {
-      const course = { id: 'course-1', hoursBalance: 5, needsRenewal: false };
+    it("should cancel and credit hours back to course when creditHoursBack is true", async () => {
+      const course = { id: "course-1", hoursBalance: 5, needsRenewal: false };
       const appt = createMockAppointment({ course });
       appointmentRepo.findOne.mockResolvedValue(appt);
       em.flush.mockResolvedValue(undefined);
 
-      const result = await service.cancelAppointment('appt-1', { creditHoursBack: true });
+      const result = await service.cancelAppointment("appt-1", {
+        creditHoursBack: true,
+      });
 
       expect(result.status).toBe(AppointmentStatus.CANCELLED);
       expect(result.creditedBack).toBe(true);
       expect(course.hoursBalance).toBe(6); // 5 + 1 hour
     });
 
-    it('should cancel without crediting hours when creditHoursBack is false', async () => {
-      const course = { id: 'course-1', hoursBalance: 5, needsRenewal: false };
+    it("should cancel without crediting hours when creditHoursBack is false", async () => {
+      const course = { id: "course-1", hoursBalance: 5, needsRenewal: false };
       const appt = createMockAppointment({ course });
       appointmentRepo.findOne.mockResolvedValue(appt);
       em.flush.mockResolvedValue(undefined);
 
-      const result = await service.cancelAppointment('appt-1', { creditHoursBack: false });
+      const result = await service.cancelAppointment("appt-1", {
+        creditHoursBack: false,
+      });
 
       expect(result.status).toBe(AppointmentStatus.CANCELLED);
       expect(result.creditedBack).toBe(false);
@@ -392,17 +456,17 @@ describe('SchedulingService', () => {
     });
   });
 
-  describe('completeAppointment', () => {
-    it('should set status to COMPLETED and update calendar with student names', async () => {
-      const appt = createMockAppointment({ googleCalendarEventId: 'gcal-1' });
+  describe("completeAppointment", () => {
+    it("should set status to COMPLETED and update calendar with student names", async () => {
+      const appt = createMockAppointment({ googleCalendarEventId: "gcal-1" });
       appointmentRepo.findOne.mockResolvedValue(appt);
 
-      const result = await service.completeAppointment('appt-1');
+      const result = await service.completeAppointment("appt-1");
       expect(result.status).toBe(AppointmentStatus.COMPLETED);
       expect(googleCalendar.updateEvent).toHaveBeenCalledWith(
-        'gcal-1',
+        "gcal-1",
         expect.objectContaining({
-          summary: expect.stringContaining('(Completed)'),
+          summary: expect.stringContaining("(Completed)"),
         }),
       );
       expect(em.flush).toHaveBeenCalled();
@@ -413,41 +477,43 @@ describe('SchedulingService', () => {
   // Availability CRUD
   // -----------------------------------------------------------------------
 
-  describe('findAvailabilityById', () => {
-    it('should return availability when found', async () => {
-      const avail = { id: 'avail-1', dayOfWeek: 1 };
+  describe("findAvailabilityById", () => {
+    it("should return availability when found", async () => {
+      const avail = { id: "avail-1", dayOfWeek: 1 };
       availabilityRepo.findOne.mockResolvedValue(avail);
-      const result = await service.findAvailabilityById('avail-1');
+      const result = await service.findAvailabilityById("avail-1");
       expect(result).toEqual(avail);
     });
 
-    it('should throw NotFoundException when not found', async () => {
+    it("should throw NotFoundException when not found", async () => {
       availabilityRepo.findOne.mockResolvedValue(null);
-      await expect(service.findAvailabilityById('bad')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('findAvailabilityByTutor', () => {
-    it('should query by tutor id', async () => {
-      availabilityRepo.find.mockResolvedValue([]);
-      await service.findAvailabilityByTutor('tut-1');
-      expect(availabilityRepo.find).toHaveBeenCalledWith(
-        { tutor: 'tut-1' },
-        expect.objectContaining({ populate: ['tutor'] }),
+      await expect(service.findAvailabilityById("bad")).rejects.toThrow(
+        NotFoundException,
       );
     });
   });
 
-  describe('createAvailability', () => {
-    it('should create availability for an existing tutor', async () => {
-      const tutor = createMockUser({ id: 'tut-1', role: UserRole.TUTOR });
+  describe("findAvailabilityByTutor", () => {
+    it("should query by tutor id", async () => {
+      availabilityRepo.find.mockResolvedValue([]);
+      await service.findAvailabilityByTutor("tut-1");
+      expect(availabilityRepo.find).toHaveBeenCalledWith(
+        { tutor: "tut-1" },
+        expect.objectContaining({ populate: ["tutor"] }),
+      );
+    });
+  });
+
+  describe("createAvailability", () => {
+    it("should create availability for an existing tutor", async () => {
+      const tutor = createMockUser({ id: "tut-1", role: UserRole.TUTOR });
       userRepo.findOne.mockResolvedValue(tutor);
 
       const dto = {
-        tutorId: 'tut-1',
+        tutorId: "tut-1",
         dayOfWeek: 1,
-        startTime: '09:00',
-        endTime: '17:00',
+        startTime: "09:00",
+        endTime: "17:00",
       };
 
       const result = await service.createAvailability(dto);
@@ -455,43 +521,52 @@ describe('SchedulingService', () => {
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if tutor not found', async () => {
+    it("should throw NotFoundException if tutor not found", async () => {
       userRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createAvailability({
-          tutorId: 'bad',
+          tutorId: "bad",
           dayOfWeek: 1,
-          startTime: '09:00',
-          endTime: '17:00',
+          startTime: "09:00",
+          endTime: "17:00",
         }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('updateAvailability', () => {
-    it('should update availability', async () => {
-      const avail = { id: 'avail-1', dayOfWeek: 1, startTime: '09:00', endTime: '17:00' };
+  describe("updateAvailability", () => {
+    it("should update availability", async () => {
+      const avail = {
+        id: "avail-1",
+        dayOfWeek: 1,
+        startTime: "09:00",
+        endTime: "17:00",
+      };
       availabilityRepo.findOne.mockResolvedValue(avail);
 
-      const result = await service.updateAvailability('avail-1', { startTime: '10:00' });
-      expect(em.assign).toHaveBeenCalledWith(avail, { startTime: '10:00' });
+      await service.updateAvailability("avail-1", {
+        startTime: "10:00",
+      });
+      expect(em.assign).toHaveBeenCalledWith(avail, { startTime: "10:00" });
       expect(em.flush).toHaveBeenCalled();
     });
   });
 
-  describe('removeAvailability', () => {
-    it('should remove availability and return confirmation', async () => {
-      const avail = { id: 'avail-1' };
+  describe("removeAvailability", () => {
+    it("should remove availability and return confirmation", async () => {
+      const avail = { id: "avail-1" };
       availabilityRepo.findOne.mockResolvedValue(avail);
 
-      const result = await service.removeAvailability('avail-1');
-      expect(result).toEqual({ id: 'avail-1', deleted: true });
+      const result = await service.removeAvailability("avail-1");
+      expect(result).toEqual({ id: "avail-1", deleted: true });
       expect(em.removeAndFlush).toHaveBeenCalledWith(avail);
     });
 
-    it('should throw NotFoundException if availability not found', async () => {
+    it("should throw NotFoundException if availability not found", async () => {
       availabilityRepo.findOne.mockResolvedValue(null);
-      await expect(service.removeAvailability('bad')).rejects.toThrow(NotFoundException);
+      await expect(service.removeAvailability("bad")).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -499,20 +574,20 @@ describe('SchedulingService', () => {
   // Attendance
   // -----------------------------------------------------------------------
 
-  describe('createAttendance', () => {
+  describe("createAttendance", () => {
     const appt = createMockAppointment();
-    const student = createMockUser({ id: 'stu-1', role: UserRole.STUDENT });
+    const student = createMockUser({ id: "stu-1", role: UserRole.STUDENT });
 
-    it('should create attendance record', async () => {
+    it("should create attendance record", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(student);
       attendanceRepo.findOne.mockResolvedValue(null); // no existing
 
       const dto = {
-        appointmentId: 'appt-1',
-        studentId: 'stu-1',
+        appointmentId: "appt-1",
+        studentId: "stu-1",
         status: AttendanceStatus.PRESENT,
-        notes: 'On time',
+        notes: "On time",
         markedByTutor: true,
       };
 
@@ -522,80 +597,84 @@ describe('SchedulingService', () => {
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if appointment not found', async () => {
+    it("should throw NotFoundException if appointment not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createAttendance({
-          appointmentId: 'bad',
-          studentId: 'stu-1',
+          appointmentId: "bad",
+          studentId: "stu-1",
           status: AttendanceStatus.PRESENT,
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw NotFoundException if student not found', async () => {
+    it("should throw NotFoundException if student not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createAttendance({
-          appointmentId: 'appt-1',
-          studentId: 'bad',
+          appointmentId: "appt-1",
+          studentId: "bad",
           status: AttendanceStatus.PRESENT,
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if attendance already exists', async () => {
+    it("should throw BadRequestException if attendance already exists", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(student);
-      attendanceRepo.findOne.mockResolvedValue({ id: 'att-existing' });
+      attendanceRepo.findOne.mockResolvedValue({ id: "att-existing" });
 
       await expect(
         service.createAttendance({
-          appointmentId: 'appt-1',
-          studentId: 'stu-1',
+          appointmentId: "appt-1",
+          studentId: "stu-1",
           status: AttendanceStatus.PRESENT,
         }),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('findAttendanceByAppointment', () => {
-    it('should query by appointment id', async () => {
+  describe("findAttendanceByAppointment", () => {
+    it("should query by appointment id", async () => {
       attendanceRepo.findOne.mockResolvedValue(null);
-      await service.findAttendanceByAppointment('appt-1');
+      await service.findAttendanceByAppointment("appt-1");
       expect(attendanceRepo.findOne).toHaveBeenCalledWith(
-        { appointment: 'appt-1' },
-        expect.objectContaining({ populate: ['appointment', 'student'] }),
+        { appointment: "appt-1" },
+        expect.objectContaining({ populate: ["appointment", "student"] }),
       );
     });
   });
 
-  describe('findAttendanceByStudent', () => {
-    it('should query by student id', async () => {
+  describe("findAttendanceByStudent", () => {
+    it("should query by student id", async () => {
       attendanceRepo.find.mockResolvedValue([]);
-      await service.findAttendanceByStudent('stu-1');
+      await service.findAttendanceByStudent("stu-1");
       expect(attendanceRepo.find).toHaveBeenCalledWith(
-        { student: 'stu-1' },
-        expect.objectContaining({ populate: ['appointment', 'student'] }),
+        { student: "stu-1" },
+        expect.objectContaining({ populate: ["appointment", "student"] }),
       );
     });
   });
 
-  describe('updateAttendance', () => {
-    it('should update attendance', async () => {
-      const att = { id: 'att-1', status: AttendanceStatus.PRESENT };
+  describe("updateAttendance", () => {
+    it("should update attendance", async () => {
+      const att = { id: "att-1", status: AttendanceStatus.PRESENT };
       attendanceRepo.findOne.mockResolvedValue(att);
 
-      await service.updateAttendance('att-1', { status: AttendanceStatus.ABSENT });
-      expect(em.assign).toHaveBeenCalledWith(att, { status: AttendanceStatus.ABSENT });
+      await service.updateAttendance("att-1", {
+        status: AttendanceStatus.ABSENT,
+      });
+      expect(em.assign).toHaveBeenCalledWith(att, {
+        status: AttendanceStatus.ABSENT,
+      });
       expect(em.flush).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException when attendance not found', async () => {
+    it("should throw NotFoundException when attendance not found", async () => {
       attendanceRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.updateAttendance('bad', { status: AttendanceStatus.ABSENT }),
+        service.updateAttendance("bad", { status: AttendanceStatus.ABSENT }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -604,125 +683,127 @@ describe('SchedulingService', () => {
   // Class Reports
   // -----------------------------------------------------------------------
 
-  describe('createClassReport', () => {
+  describe("createClassReport", () => {
     const appt = createMockAppointment();
-    const tutor = createMockUser({ id: 'tut-1', role: UserRole.TUTOR });
+    const tutor = createMockUser({ id: "tut-1", role: UserRole.TUTOR });
 
-    it('should create a class report', async () => {
+    it("should create a class report", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(tutor);
       classReportRepo.findOne.mockResolvedValue(null); // no existing
 
       const dto = {
-        appointmentId: 'appt-1',
-        tutorId: 'tut-1',
-        subject: 'Past tense',
-        content: 'Covered regular verbs',
-        homeworkAssigned: 'Exercises 1-10',
-        studentProgress: 'Good',
-        nextLessonNotes: 'Irregular verbs',
+        appointmentId: "appt-1",
+        tutorId: "tut-1",
+        subject: "Past tense",
+        content: "Covered regular verbs",
+        homeworkAssigned: "Exercises 1-10",
+        studentProgress: "Good",
+        nextLessonNotes: "Irregular verbs",
       };
 
       const result = await service.createClassReport(dto);
       expect(result).toBeDefined();
-      expect(result.subject).toBe('Past tense');
+      expect(result.subject).toBe("Past tense");
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException if appointment not found', async () => {
+    it("should throw NotFoundException if appointment not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createClassReport({
-          appointmentId: 'bad',
-          tutorId: 'tut-1',
-          subject: 's',
-          content: 'c',
+          appointmentId: "bad",
+          tutorId: "tut-1",
+          subject: "s",
+          content: "c",
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw NotFoundException if tutor not found', async () => {
+    it("should throw NotFoundException if tutor not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createClassReport({
-          appointmentId: 'appt-1',
-          tutorId: 'bad',
-          subject: 's',
-          content: 'c',
+          appointmentId: "appt-1",
+          tutorId: "bad",
+          subject: "s",
+          content: "c",
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException if report already exists', async () => {
+    it("should throw BadRequestException if report already exists", async () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
       userRepo.findOne.mockResolvedValue(tutor);
-      classReportRepo.findOne.mockResolvedValue({ id: 'existing' });
+      classReportRepo.findOne.mockResolvedValue({ id: "existing" });
 
       await expect(
         service.createClassReport({
-          appointmentId: 'appt-1',
-          tutorId: 'tut-1',
-          subject: 's',
-          content: 'c',
+          appointmentId: "appt-1",
+          tutorId: "tut-1",
+          subject: "s",
+          content: "c",
         }),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('findClassReportByAppointment', () => {
-    it('should query by appointment id', async () => {
+  describe("findClassReportByAppointment", () => {
+    it("should query by appointment id", async () => {
       classReportRepo.findOne.mockResolvedValue(null);
-      await service.findClassReportByAppointment('appt-1');
+      await service.findClassReportByAppointment("appt-1");
       expect(classReportRepo.findOne).toHaveBeenCalledWith(
-        { appointment: 'appt-1' },
-        expect.objectContaining({ populate: ['appointment', 'tutor'] }),
+        { appointment: "appt-1" },
+        expect.objectContaining({ populate: ["appointment", "tutor"] }),
       );
     });
   });
 
-  describe('findClassReportsByTutor', () => {
-    it('should query by tutor id', async () => {
+  describe("findClassReportsByTutor", () => {
+    it("should query by tutor id", async () => {
       classReportRepo.find.mockResolvedValue([]);
-      await service.findClassReportsByTutor('tut-1');
+      await service.findClassReportsByTutor("tut-1");
       expect(classReportRepo.find).toHaveBeenCalledWith(
-        { tutor: 'tut-1' },
-        expect.objectContaining({ populate: ['appointment', 'tutor'] }),
+        { tutor: "tut-1" },
+        expect.objectContaining({ populate: ["appointment", "tutor"] }),
       );
     });
   });
 
-  describe('updateClassReport', () => {
-    it('should update class report', async () => {
-      const report = { id: 'rep-1', subject: 'Old' };
+  describe("updateClassReport", () => {
+    it("should update class report", async () => {
+      const report = { id: "rep-1", subject: "Old" };
       classReportRepo.findOne.mockResolvedValue(report);
 
-      await service.updateClassReport('rep-1', { subject: 'New' });
-      expect(em.assign).toHaveBeenCalledWith(report, { subject: 'New' });
+      await service.updateClassReport("rep-1", { subject: "New" });
+      expect(em.assign).toHaveBeenCalledWith(report, { subject: "New" });
       expect(em.flush).toHaveBeenCalled();
     });
 
-    it('should throw NotFoundException when report not found', async () => {
+    it("should throw NotFoundException when report not found", async () => {
       classReportRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.updateClassReport('bad', { subject: 'New' }),
+        service.updateClassReport("bad", { subject: "New" }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('removeClassReport', () => {
-    it('should remove class report and return confirmation', async () => {
-      const report = { id: 'rep-1' };
+  describe("removeClassReport", () => {
+    it("should remove class report and return confirmation", async () => {
+      const report = { id: "rep-1" };
       classReportRepo.findOne.mockResolvedValue(report);
 
-      const result = await service.removeClassReport('rep-1');
-      expect(result).toEqual({ id: 'rep-1', deleted: true });
+      const result = await service.removeClassReport("rep-1");
+      expect(result).toEqual({ id: "rep-1", deleted: true });
       expect(em.removeAndFlush).toHaveBeenCalledWith(report);
     });
 
-    it('should throw NotFoundException when report not found', async () => {
+    it("should throw NotFoundException when report not found", async () => {
       classReportRepo.findOne.mockResolvedValue(null);
-      await expect(service.removeClassReport('bad')).rejects.toThrow(NotFoundException);
+      await expect(service.removeClassReport("bad")).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -730,17 +811,17 @@ describe('SchedulingService', () => {
   // Scheduling stats
   // -----------------------------------------------------------------------
 
-  describe('getSchedulingStats', () => {
-    it('should return correct stats', async () => {
+  describe("getSchedulingStats", () => {
+    it("should return correct stats", async () => {
       const appt1 = createMockAppointment({
         status: AppointmentStatus.COMPLETED,
-        startTime: new Date('2026-03-01T10:00:00Z'),
-        endTime: new Date('2026-03-01T11:00:00Z'),
+        startTime: new Date("2026-03-01T10:00:00Z"),
+        endTime: new Date("2026-03-01T11:00:00Z"),
       });
       const appt2 = createMockAppointment({
         status: AppointmentStatus.SCHEDULED,
-        startTime: new Date('2026-12-01T10:00:00Z'),
-        endTime: new Date('2026-12-01T12:00:00Z'),
+        startTime: new Date("2026-12-01T10:00:00Z"),
+        endTime: new Date("2026-12-01T12:00:00Z"),
       });
 
       // upcoming appointments
@@ -750,12 +831,12 @@ describe('SchedulingService', () => {
       appointmentRepo.find.mockResolvedValueOnce([appt2]); // scheduled
 
       const result = await service.getSchedulingStats();
-      expect(result).toHaveProperty('upcomingAppointments');
-      expect(result).toHaveProperty('completedAppointmentsThisMonth', 3);
-      expect(result).toHaveProperty('totalHoursTaught');
-      expect(result).toHaveProperty('totalScheduledHours');
-      expect(result).toHaveProperty('totalCompletedAppointments');
-      expect(result).toHaveProperty('totalScheduledAppointments');
+      expect(result).toHaveProperty("upcomingAppointments");
+      expect(result).toHaveProperty("completedAppointmentsThisMonth", 3);
+      expect(result).toHaveProperty("totalHoursTaught");
+      expect(result).toHaveProperty("totalScheduledHours");
+      expect(result).toHaveProperty("totalCompletedAppointments");
+      expect(result).toHaveProperty("totalScheduledAppointments");
     });
   });
 
@@ -763,15 +844,15 @@ describe('SchedulingService', () => {
   // Attendance stats
   // -----------------------------------------------------------------------
 
-  describe('getAttendanceStats', () => {
-    it('should return stats with calculated attendance rate', async () => {
+  describe("getAttendanceStats", () => {
+    it("should return stats with calculated attendance rate", async () => {
       attendanceRepo.count
         .mockResolvedValueOnce(10) // total
-        .mockResolvedValueOnce(7)  // present
-        .mockResolvedValueOnce(2)  // absent
+        .mockResolvedValueOnce(7) // present
+        .mockResolvedValueOnce(2) // absent
         .mockResolvedValueOnce(1); // on_time_cancellation
 
-      const result = await service.getAttendanceStats('stu-1');
+      const result = await service.getAttendanceStats("stu-1");
       expect(result.totalAttendance).toBe(10);
       expect(result.presentCount).toBe(7);
       expect(result.absentCount).toBe(2);
@@ -779,7 +860,7 @@ describe('SchedulingService', () => {
       expect(result.attendanceRate).toBe(70);
     });
 
-    it('should return 0% when no attendance records', async () => {
+    it("should return 0% when no attendance records", async () => {
       attendanceRepo.count.mockResolvedValue(0);
       const result = await service.getAttendanceStats();
       expect(result.attendanceRate).toBe(0);

@@ -270,7 +270,7 @@ export default function Packages() {
           <div className="bg-gradient-to-br from-spicy-light to-spicy-yellow rounded-2xl p-8 md:p-12 text-center">
             <h2 className="text-3xl font-display font-bold mb-4">30-Day Money Back Guarantee</h2>
             <p className="text-lg max-w-2xl mx-auto mb-8">
-              We're confident you'll love learning with Spicy Spanish. If you're not completely satisfied within your first 30 days, we'll give you a full refund. No questions asked.
+              We&apos;re confident you&apos;ll love learning with Spicy Spanish. If you&apos;re not completely satisfied within your first 30 days, we&apos;ll give you a full refund. No questions asked.
             </p>
             <Link href="/register" className="btn-primary">
               Start Risk-Free Today

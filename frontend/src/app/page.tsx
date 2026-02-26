@@ -144,8 +144,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "Spicy Spanish has transformed my language learning experience. The tutors are engaging and the 
-                curriculum is perfectly tailored to my goals. ¡Muy recomendado!"
+                &ldquo;Spicy Spanish has transformed my language learning experience. The tutors are engaging and the
+                curriculum is perfectly tailored to my goals. ¡Muy recomendado!&rdquo;
               </p>
             </div>
 
@@ -158,8 +158,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "The flexibility of scheduling and the expertise of the tutors have made learning Spanish enjoyable 
-                and effective. I've improved significantly in just a few months."
+                &ldquo;The flexibility of scheduling and the expertise of the tutors have made learning Spanish enjoyable
+                and effective. I&apos;ve improved significantly in just a few months.&rdquo;
               </p>
             </div>
 
@@ -172,8 +172,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-700">
-                "As a beginner, I was nervous about starting Spanish lessons, but the tutors at Spicy Spanish made me 
-                feel comfortable and confident from day one. Now I look forward to every class!"
+                &ldquo;As a beginner, I was nervous about starting Spanish lessons, but the tutors at Spicy Spanish made me
+                feel comfortable and confident from day one. Now I look forward to every class!&rdquo;
               </p>
             </div>
           </div>

@@ -162,7 +162,7 @@ export default function InviteTutorPage() {
                 </p>
                 {formData.message && (
                   <p className="text-sm text-gray-600 mb-2 italic">
-                    "{formData.message}"
+                    &ldquo;{formData.message}&rdquo;
                   </p>
                 )}
                 <p className="text-sm text-gray-600">

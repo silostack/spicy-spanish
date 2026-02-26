@@ -1,11 +1,30 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Logger } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString, IsDateString, IsBoolean, MinLength, IsNumber, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
-import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from './entities/user.entity';
+import {
+  Controller,
+  Get,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  Logger,
+} from "@nestjs/common";
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsBoolean,
+  MinLength,
+  IsNumber,
+  IsIn,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { UsersService } from "./users.service";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import { Roles } from "../common/decorators/roles.decorator";
+import { UserRole } from "./entities/user.entity";
 
 class UpdateUserDto {
   @IsOptional()
@@ -78,11 +97,11 @@ class StudentListQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(['all', 'active', 'inactive', 'new'])
-  filter?: 'all' | 'active' | 'inactive' | 'new';
+  @IsIn(["all", "active", "inactive", "new"])
+  filter?: "all" | "active" | "inactive" | "new";
 }
 
-@Controller('users')
+@Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
@@ -95,7 +114,7 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Get('students')
+  @Get("students")
   @Roles(UserRole.ADMIN)
   getStudents(@Query() query: StudentListQueryDto) {
     // Convert string query params to numbers
@@ -107,15 +126,18 @@ export class UsersController {
     return this.usersService.getStudentsWithPagination(parsedQuery);
   }
 
-  @Get('tutors')
+  @Get("tutors")
   @Roles(UserRole.ADMIN, UserRole.STUDENT)
   getTutors() {
     return this.usersService.getTutors();
   }
 
-  @Get('tutors/:tutorId/students')
+  @Get("tutors/:tutorId/students")
   @Roles(UserRole.ADMIN, UserRole.TUTOR)
-  getStudentsByTutor(@Param('tutorId') tutorId: string, @Query() query: StudentListQueryDto) {
+  getStudentsByTutor(
+    @Param("tutorId") tutorId: string,
+    @Query() query: StudentListQueryDto,
+  ) {
     // Convert string query params to numbers
     const parsedQuery = {
       ...query,
@@ -125,43 +147,43 @@ export class UsersController {
     return this.usersService.getStudentsByTutorId(tutorId, parsedQuery);
   }
 
-  @Get('students/:id')
+  @Get("students/:id")
   @Roles(UserRole.ADMIN, UserRole.TUTOR)
-  getStudentById(@Param('id') id: string) {
+  getStudentById(@Param("id") id: string) {
     return this.usersService.getStudentById(id);
   }
 
-  @Get('count')
+  @Get("count")
   @Roles(UserRole.ADMIN)
   countUsers() {
     return this.usersService.countUsers();
   }
 
-  @Get(':id')
+  @Get(":id")
   @Roles(UserRole.ADMIN)
-  findOne(@Param('id') id: string) {
+  findOne(@Param("id") id: string) {
     return this.usersService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN, UserRole.TUTOR, UserRole.STUDENT)
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  update(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
     this.logger.log(`Updating user ${id}`);
 
     // Transform the DTO to match User entity types
     const updateData: any = { ...updateUserDto };
-    
+
     // Convert dateOfBirth string to Date if provided
-    if (updateData.dateOfBirth && typeof updateData.dateOfBirth === 'string') {
+    if (updateData.dateOfBirth && typeof updateData.dateOfBirth === "string") {
       updateData.dateOfBirth = new Date(updateData.dateOfBirth);
     }
-    
+
     return this.usersService.update(id, updateData);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @Roles(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
+  remove(@Param("id") id: string) {
     return this.usersService.remove(id);
   }
 }

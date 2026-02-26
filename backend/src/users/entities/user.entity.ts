@@ -1,11 +1,11 @@
-import { Entity, Enum, PrimaryKey, Property, OneToMany, Collection } from '@mikro-orm/core';
-import { v4 } from 'uuid';
-import { Exclude } from 'class-transformer';
+import { Entity, Enum, PrimaryKey, Property } from "@mikro-orm/core";
+import { v4 } from "uuid";
+import { Exclude } from "class-transformer";
 
 export enum UserRole {
-  ADMIN = 'admin',
-  TUTOR = 'tutor',
-  STUDENT = 'student',
+  ADMIN = "admin",
+  TUTOR = "tutor",
+  STUDENT = "student",
 }
 
 @Entity()
