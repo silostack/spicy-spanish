@@ -4,109 +4,82 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import api from '../utils/api';
 import { useAuth } from './AuthContext';
 
-export type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
+interface CourseSchedule {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+interface CourseUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
 
 interface Course {
   id: string;
   title: string;
-  description: string;
-  learningLevel: LearningLevel;
-  imageUrl?: string;
-  price?: number;
-  durationWeeks?: number;
-  lessonCount?: number;
+  tutor: CourseUser;
+  students: CourseUser[];
+  schedules: CourseSchedule[];
+  startDate: string;
   isActive: boolean;
+  hoursBalance: number;
+  needsRenewal: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-interface CourseLesson {
-  id: string;
-  courseId: string;
+interface CreateCoursePayload {
   title: string;
-  description: string;
-  order: number;
-  content: string;
-  materials?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface StudentCourse {
-  id: string;
-  studentId: string;
-  courseId: string;
-  enrollmentDate: string;
-  completionPercentage: number;
-  isCompleted: boolean;
-  lastAccessed?: string;
-  course: Course;
+  tutorId: string;
+  studentIds: string[];
+  startDate: string;
+  schedules: { dayOfWeek: number; startTime: string; endTime: string }[];
 }
 
 interface CoursesContextType {
   courses: Course[];
-  studentCourses: StudentCourse[];
   currentCourse: Course | null;
-  currentLesson: CourseLesson | null;
   isLoading: boolean;
   error: string | null;
   fetchCourses: () => Promise<void>;
-  fetchStudentCourses: () => Promise<void>;
   fetchCourseById: (id: string) => Promise<void>;
-  fetchLessonById: (courseId: string, lessonId: string) => Promise<void>;
-  enrollInCourse: (courseId: string) => Promise<void>;
-  updateLessonProgress: (lessonId: string, isCompleted: boolean) => Promise<void>;
+  createCourse: (dto: CreateCoursePayload) => Promise<void>;
+  updateCourse: (id: string, dto: Partial<{ title: string; isActive: boolean }>) => Promise<void>;
+  addStudent: (courseId: string, studentId: string) => Promise<void>;
+  removeStudent: (courseId: string, studentId: string) => Promise<void>;
+  addSchedule: (courseId: string, dto: { dayOfWeek: number; startTime: string; endTime: string }) => Promise<void>;
+  removeSchedule: (scheduleId: string) => Promise<void>;
+  adjustHours: (courseId: string, hours: number) => Promise<void>;
 }
 
 const CoursesContext = createContext<CoursesContextType | undefined>(undefined);
 
 export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [studentCourses, setStudentCourses] = useState<StudentCourse[]>([]);
   const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
-  const [currentLesson, setCurrentLesson] = useState<CourseLesson | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token, user } = useAuth();
+  const { token } = useAuth();
 
   const fetchCourses = async () => {
     if (!token) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await api.get('/courses', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
       setCourses(response.data);
-    } catch (error) {
-
+    } catch {
       setError('Failed to fetch courses');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchStudentCourses = async () => {
-    if (!token || !user || user.role !== 'student') return;
-    
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.get(`/courses/assignments/student/${user.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      setStudentCourses(response.data);
-    } catch (error) {
-
-      setError('Failed to fetch your enrolled courses');
     } finally {
       setIsLoading(false);
     }
@@ -114,87 +87,203 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const fetchCourseById = async (id: string) => {
     if (!token) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await api.get(`/courses/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
       setCurrentCourse(response.data);
-    } catch (error) {
-
+    } catch {
       setError('Failed to fetch course details');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchLessonById = async (courseId: string, lessonId: string) => {
+  const createCourse = async (dto: CreateCoursePayload) => {
+    if (!token) return;
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      const response = await api.get(`/courses/${courseId}/lessons/${lessonId}`, {
+
+      const response = await api.post('/courses', dto, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
-      setCurrentLesson(response.data);
-    } catch (error) {
-
-      setError('Failed to fetch lesson');
+      setCourses((prev) => [...prev, response.data]);
+    } catch {
+      setError('Failed to create course');
+      throw new Error('Failed to create course');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const enrollInCourse = async (courseId: string) => {
-    if (!token || !user) return;
-    
+  const updateCourse = async (id: string, dto: Partial<{ title: string; isActive: boolean }>) => {
+    if (!token) return;
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      await api.post('/courses/assignments', { studentId: user.id, courseId }, {
+
+      const response = await api.patch(`/courses/${id}`, dto, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
-      // Refresh student courses after enrollment
-      await fetchStudentCourses();
-    } catch (error) {
-
-      setError('Failed to enroll in course');
-      throw error;
+      setCourses((prev) => prev.map((c) => (c.id === id ? response.data : c)));
+      if (currentCourse?.id === id) {
+        setCurrentCourse(response.data);
+      }
+    } catch {
+      setError('Failed to update course');
+      throw new Error('Failed to update course');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateLessonProgress = async (lessonId: string, isCompleted: boolean) => {
-    if (!token || !user) return;
-    
+  const addStudent = async (courseId: string, studentId: string) => {
+    if (!token) return;
+
     try {
       setIsLoading(true);
       setError(null);
-      
-      await api.patch(`/courses/lessons/${lessonId}/progress`, { isCompleted }, {
+
+      const response = await api.post(
+        `/courses/${courseId}/students`,
+        { studentId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      setCourses((prev) => prev.map((c) => (c.id === courseId ? response.data : c)));
+      if (currentCourse?.id === courseId) {
+        setCurrentCourse(response.data);
+      }
+    } catch {
+      setError('Failed to add student to course');
+      throw new Error('Failed to add student to course');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeStudent = async (courseId: string, studentId: string) => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await api.delete(`/courses/${courseId}/students`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        data: { studentId },
+      });
+      setCourses((prev) => prev.map((c) => (c.id === courseId ? response.data : c)));
+      if (currentCourse?.id === courseId) {
+        setCurrentCourse(response.data);
+      }
+    } catch {
+      setError('Failed to remove student from course');
+      throw new Error('Failed to remove student from course');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addSchedule = async (
+    courseId: string,
+    dto: { dayOfWeek: number; startTime: string; endTime: string },
+  ) => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await api.post(`/courses/${courseId}/schedules`, dto, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
-      // Refresh student courses to update progress
-      await fetchStudentCourses();
-    } catch (error) {
+      setCourses((prev) => prev.map((c) => (c.id === courseId ? response.data : c)));
+      if (currentCourse?.id === courseId) {
+        setCurrentCourse(response.data);
+      }
+    } catch {
+      setError('Failed to add schedule');
+      throw new Error('Failed to add schedule');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      setError('Failed to update lesson progress');
+  const removeSchedule = async (scheduleId: string) => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      await api.delete(`/courses/schedules/${scheduleId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      // Refresh current course if loaded to reflect removed schedule
+      if (currentCourse) {
+        setCurrentCourse((prev) =>
+          prev
+            ? {
+                ...prev,
+                schedules: prev.schedules.filter((s) => s.id !== scheduleId),
+              }
+            : null,
+        );
+      }
+    } catch {
+      setError('Failed to remove schedule');
+      throw new Error('Failed to remove schedule');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const adjustHours = async (courseId: string, hours: number) => {
+    if (!token) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await api.patch(
+        `/courses/${courseId}/hours`,
+        { hours },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      setCourses((prev) => prev.map((c) => (c.id === courseId ? response.data : c)));
+      if (currentCourse?.id === courseId) {
+        setCurrentCourse(response.data);
+      }
+    } catch {
+      setError('Failed to adjust hours');
+      throw new Error('Failed to adjust hours');
     } finally {
       setIsLoading(false);
     }
@@ -202,29 +291,27 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Fetch initial data if user is logged in
   useEffect(() => {
-    if (token && user) {
+    if (token) {
       fetchCourses();
-      if (user.role === 'student') {
-        fetchStudentCourses();
-      }
     }
-  }, [token, user]);
+  }, [token]);
 
   return (
     <CoursesContext.Provider
       value={{
         courses,
-        studentCourses,
         currentCourse,
-        currentLesson,
         isLoading,
         error,
         fetchCourses,
-        fetchStudentCourses,
         fetchCourseById,
-        fetchLessonById,
-        enrollInCourse,
-        updateLessonProgress,
+        createCourse,
+        updateCourse,
+        addStudent,
+        removeStudent,
+        addSchedule,
+        removeSchedule,
+        adjustHours,
       }}
     >
       {children}
@@ -234,10 +321,10 @@ export const CoursesProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 export const useCourses = (): CoursesContextType => {
   const context = useContext(CoursesContext);
-  
+
   if (context === undefined) {
     throw new Error('useCourses must be used within a CoursesProvider');
   }
-  
+
   return context;
 };
