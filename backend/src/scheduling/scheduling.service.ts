@@ -543,9 +543,10 @@ export class SchedulingService {
 
   // Attendance methods
   async createAttendance(createAttendanceDto: CreateAttendanceDto) {
-    const appointment = await this.appointmentRepository.findOne({
-      id: createAttendanceDto.appointmentId,
-    });
+    const appointment = await this.appointmentRepository.findOne(
+      { id: createAttendanceDto.appointmentId },
+      { populate: ["course"] },
+    );
     if (!appointment) {
       throw new NotFoundException(
         `Appointment with ID ${createAttendanceDto.appointmentId} not found`,
@@ -579,6 +580,16 @@ export class SchedulingService {
       createAttendanceDto.notes,
       createAttendanceDto.markedByTutor,
     );
+
+    // Debit course hours when the class took place (present or absent — not on-time cancellation)
+    if (createAttendanceDto.status !== AttendanceStatus.ON_TIME_CANCELLATION) {
+      const durationHours =
+        (appointment.endTime.getTime() - appointment.startTime.getTime()) /
+        (1000 * 60 * 60);
+      const course = appointment.course;
+      course.hoursBalance = Number(course.hoursBalance) - durationHours;
+      course.needsRenewal = course.hoursBalance <= 0;
+    }
 
     await this.em.persistAndFlush(attendance);
     return attendance;
