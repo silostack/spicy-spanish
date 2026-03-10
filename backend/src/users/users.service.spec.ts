@@ -5,7 +5,7 @@ import { NotFoundException, ConflictException } from "@nestjs/common";
 import { UsersService } from "./users.service";
 import { User, UserRole } from "./entities/user.entity";
 import { Transaction } from "../payments/entities/transaction.entity";
-import { Appointment } from "../scheduling/entities/appointment.entity";
+import { Lesson } from "../scheduling/entities/lesson.entity";
 import * as bcrypt from "bcrypt";
 
 jest.mock("bcrypt");
@@ -388,7 +388,7 @@ describe("UsersService", () => {
       const student = mockUser();
       em.find.mockImplementation(
         (entity: any, criteria: any, _options?: any) => {
-          if (entity === Appointment && criteria?.tutor === "tutor-1") {
+          if (entity === Lesson && criteria?.tutor === "tutor-1") {
             return Promise.resolve([
               { students: { getItems: () => [{ id: "user-1" }] } },
             ]);
@@ -406,7 +406,7 @@ describe("UsersService", () => {
       });
 
       expect(em.find).toHaveBeenCalledWith(
-        Appointment,
+        Lesson,
         { tutor: "tutor-1" },
         { populate: ["students"] },
       );
@@ -437,7 +437,7 @@ describe("UsersService", () => {
       expect(result.items[0].coursesEnrolled).toBe(2);
     });
 
-    it("should include lastActive from last appointment", async () => {
+    it("should include lastActive from last lesson", async () => {
       const student = mockUser();
       const appointmentDate = new Date("2026-02-01");
       userRepository.findAndCount.mockResolvedValue([[student], 1]);
@@ -463,7 +463,7 @@ describe("UsersService", () => {
         if (entity === Transaction) {
           return Promise.resolve([{ hours: 10 }, { hours: 5 }]);
         }
-        if (entity === Appointment) {
+        if (entity === Lesson) {
           return Promise.resolve([{ status: "completed", startTime, endTime }]);
         }
         return Promise.resolve([]);
@@ -492,7 +492,7 @@ describe("UsersService", () => {
       );
     });
 
-    it("should return zero hours when no transactions or appointments exist", async () => {
+    it("should return zero hours when no transactions or lessons exist", async () => {
       const student = mockUser({ id: "student-1", role: UserRole.STUDENT });
       userRepository.findOne.mockResolvedValue(student);
       em.find.mockResolvedValue([]);
@@ -513,7 +513,7 @@ describe("UsersService", () => {
 
       // getStudentsWithPagination internals
       em.find.mockImplementation((entity: any, criteria: any) => {
-        if (entity === Appointment && criteria?.tutor === "tutor-1") {
+        if (entity === Lesson && criteria?.tutor === "tutor-1") {
           return Promise.resolve([
             { students: { getItems: () => [{ id: "student-1" }] } },
           ]);

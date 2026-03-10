@@ -11,11 +11,13 @@ import {
   Matches,
   IsArray,
   ArrayMinSize,
+  ValidateNested,
 } from "class-validator";
-import { AppointmentStatus } from "../entities/appointment.entity";
+import { Type } from "class-transformer";
+import { LessonStatus } from "../entities/lesson.entity";
 import { AttendanceStatus } from "../entities/attendance.entity";
 
-export class CreateAppointmentDto {
+export class CreateLessonDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsUUID(undefined, { each: true })
@@ -38,7 +40,7 @@ export class CreateAppointmentDto {
   notes?: string;
 }
 
-export class UpdateAppointmentDto {
+export class UpdateLessonDto {
   @IsOptional()
   @IsDateString()
   startTime?: Date;
@@ -48,15 +50,15 @@ export class UpdateAppointmentDto {
   endTime?: Date;
 
   @IsOptional()
-  @IsEnum(AppointmentStatus)
-  status?: AppointmentStatus;
+  @IsEnum(LessonStatus)
+  status?: LessonStatus;
 
   @IsOptional()
   @IsString()
   notes?: string;
 }
 
-export class CancelAppointmentDto {
+export class CancelLessonDto {
   @IsBoolean()
   creditHoursBack: boolean;
 }
@@ -110,8 +112,13 @@ export class UpdateAvailabilityDto {
 }
 
 export class CreateAttendanceDto {
+  @IsOptional()
   @IsUUID()
-  appointmentId: string;
+  lessonId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  appointmentId?: string;
 
   @IsUUID()
   studentId: string;
@@ -139,8 +146,13 @@ export class UpdateAttendanceDto {
 }
 
 export class CreateClassReportDto {
+  @IsOptional()
   @IsUUID()
-  appointmentId: string;
+  lessonId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  appointmentId?: string;
 
   @IsUUID()
   tutorId: string;
@@ -162,6 +174,63 @@ export class CreateClassReportDto {
   @IsOptional()
   @IsString()
   nextLessonNotes?: string;
+}
+
+export class CompleteLessonAttendanceDto {
+  @IsUUID()
+  studentId: string;
+
+  @IsEnum(AttendanceStatus)
+  status: AttendanceStatus;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CompleteLessonReportDto {
+  @IsString()
+  subject: string;
+
+  @IsString()
+  content: string;
+
+  @IsOptional()
+  @IsString()
+  homeworkAssigned?: string;
+
+  @IsOptional()
+  @IsString()
+  studentProgress?: string;
+
+  @IsOptional()
+  @IsString()
+  nextLessonNotes?: string;
+}
+
+export class CompleteLessonDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CompleteLessonAttendanceDto)
+  attendances: CompleteLessonAttendanceDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CompleteLessonReportDto)
+  report?: CompleteLessonReportDto;
+}
+
+export class RescheduleLessonDto {
+  @IsDateString()
+  startTime: Date;
+
+  @IsDateString()
+  endTime: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
 
 export class UpdateClassReportDto {

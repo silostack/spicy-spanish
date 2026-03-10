@@ -11,7 +11,7 @@ import {
   Transaction,
   TransactionStatus,
 } from "../payments/entities/transaction.entity";
-import { Appointment } from "../scheduling/entities/appointment.entity";
+import { Lesson } from "../scheduling/entities/lesson.entity";
 import * as bcrypt from "bcrypt";
 
 interface StudentListQuery {
@@ -168,15 +168,15 @@ export class UsersService {
     let total;
 
     if (tutorId) {
-      // Get students that have had appointments with this tutor
-      const appointments = await this.em.find(
-        Appointment,
+      // Get students that have had lessons with this tutor
+      const lessons = await this.em.find(
+        Lesson,
         { tutor: tutorId },
         { populate: ["students"] },
       );
 
       const studentIdSet = new Set<string>();
-      for (const apt of appointments) {
+      for (const apt of lessons) {
         for (const s of apt.students.getItems()) {
           studentIdSet.add(s.id);
         }
@@ -207,13 +207,13 @@ export class UsersService {
       students.map(async (student) => {
         const [appointmentsCount, transactions, lastAppointment] =
           await Promise.all([
-            this.em.count(Appointment, { students: student.id }),
+            this.em.count(Lesson, { students: student.id }),
             this.em.find(Transaction, {
               student: student.id,
               status: TransactionStatus.COMPLETED,
             }),
             this.em.findOne(
-              Appointment,
+              Lesson,
               { students: student.id },
               { orderBy: { startTime: "DESC" } },
             ),
@@ -258,13 +258,13 @@ export class UsersService {
     }
 
     // Get detailed information
-    const [transactions, appointments] = await Promise.all([
+    const [transactions, lessons] = await Promise.all([
       this.em.find(Transaction, {
         student: id,
         status: TransactionStatus.COMPLETED,
       }),
       this.em.find(
-        Appointment,
+        Lesson,
         { students: id },
         {
           populate: ["tutor", "course"],
@@ -279,7 +279,7 @@ export class UsersService {
       (total, t) => total + t.hours,
       0,
     );
-    const hoursUsed = appointments
+    const hoursUsed = lessons
       .filter((a) => a.status === "completed")
       .reduce((total, a) => {
         const durationMs =
@@ -291,7 +291,7 @@ export class UsersService {
     return {
       ...student,
       transactions,
-      recentAppointments: appointments,
+      recentAppointments: lessons,
       totalHoursPurchased,
       hoursUsed,
       availableHours,

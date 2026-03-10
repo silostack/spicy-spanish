@@ -1,6 +1,6 @@
 import { Entity, ManyToOne, PrimaryKey, Property } from "@mikro-orm/core";
 import { v4 } from "uuid";
-import { Appointment } from "./appointment.entity";
+import { Lesson } from "./lesson.entity";
 import { User } from "../../users/entities/user.entity";
 
 @Entity()
@@ -8,8 +8,8 @@ export class ClassReport {
   @PrimaryKey()
   id: string = v4();
 
-  @ManyToOne(() => Appointment)
-  appointment!: Appointment;
+  @ManyToOne(() => Lesson)
+  lesson!: Lesson;
 
   @ManyToOne(() => User)
   tutor!: User;
@@ -36,7 +36,7 @@ export class ClassReport {
   updatedAt: Date = new Date();
 
   constructor(
-    appointment: Appointment,
+    lesson: Lesson,
     tutor: User,
     subject: string,
     content: string,
@@ -44,7 +44,7 @@ export class ClassReport {
     studentProgress?: string,
     nextLessonNotes?: string,
   ) {
-    this.appointment = appointment;
+    this.lesson = lesson;
     this.tutor = tutor;
     this.subject = subject;
     this.content = content;

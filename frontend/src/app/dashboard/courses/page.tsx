@@ -59,7 +59,14 @@ export default function CoursesPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/courses');
+      let endpoint = '/courses';
+      if (user?.role === 'tutor') {
+        endpoint = `/courses/tutor/${user.id}`;
+      } else if (user?.role === 'student') {
+        endpoint = `/courses/student/${user.id}`;
+      }
+
+      const response = await api.get(endpoint);
 
       let allCourses: Course[] = Array.isArray(response.data)
         ? response.data

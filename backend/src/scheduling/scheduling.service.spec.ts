@@ -5,19 +5,20 @@ import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { SchedulingService } from "./scheduling.service";
 import { GoogleCalendarService } from "./google-calendar.service";
 import { EmailService } from "../email/email.service";
-import { Appointment, AppointmentStatus } from "./entities/appointment.entity";
+import { Lesson, LessonStatus } from "./entities/lesson.entity";
 import { Availability } from "./entities/availability.entity";
 import { Attendance, AttendanceStatus } from "./entities/attendance.entity";
 import { ClassReport } from "./entities/class-report.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { Course } from "../courses/entities/course.entity";
+import { LessonGeneratorService } from "./lesson-generator.service";
 
-// Mock the Appointment entity so that `new Appointment(...)` in the service
+// Mock the Lesson entity so that `new Lesson(...)` in the service
 // returns a plain object with a simple students collection stub rather than a
 // real MikroORM Collection (which requires metadata to be initialised and
 // therefore fails in unit-test context).
-jest.mock("./entities/appointment.entity", () => {
-  const original = jest.requireActual("./entities/appointment.entity");
+jest.mock("./entities/lesson.entity", () => {
+  const original = jest.requireActual("./entities/lesson.entity");
   class MockAppointment {
     id = "appt-new";
     students = { add: jest.fn(), getItems: () => [] };
@@ -25,7 +26,7 @@ jest.mock("./entities/appointment.entity", () => {
     course: any;
     startTime: Date;
     endTime: Date;
-    status = original.AppointmentStatus.SCHEDULED;
+    status = original.LessonStatus.SCHEDULED;
     notes?: string;
     googleCalendarEventId?: string;
     confirmationEmailSent = false;
@@ -42,7 +43,7 @@ jest.mock("./entities/appointment.entity", () => {
       this.endTime = endTime;
     }
   }
-  return { ...original, Appointment: MockAppointment };
+  return { ...original, Lesson: MockAppointment };
 });
 
 // ---------------------------------------------------------------------------
@@ -97,7 +98,7 @@ function createMockAppointment(overrides?: Partial<any>): any {
     course,
     startTime: new Date("2026-03-01T10:00:00Z"),
     endTime: new Date("2026-03-01T11:00:00Z"),
-    status: AppointmentStatus.SCHEDULED,
+    status: LessonStatus.SCHEDULED,
     notes: undefined,
     creditedBack: undefined,
     googleCalendarEventId: undefined,
@@ -171,7 +172,7 @@ describe("SchedulingService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SchedulingService,
-        { provide: getRepositoryToken(Appointment), useValue: appointmentRepo },
+        { provide: getRepositoryToken(Lesson), useValue: appointmentRepo },
         {
           provide: getRepositoryToken(Availability),
           useValue: availabilityRepo,
@@ -183,6 +184,10 @@ describe("SchedulingService", () => {
         { provide: EntityManager, useValue: em },
         { provide: GoogleCalendarService, useValue: googleCalendar },
         { provide: EmailService, useValue: emailService },
+        {
+          provide: LessonGeneratorService,
+          useValue: { generateLessonsForCourse: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -194,16 +199,16 @@ describe("SchedulingService", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Appointment CRUD
+  // Lesson CRUD
   // -----------------------------------------------------------------------
 
   describe("findAllAppointments", () => {
-    it("should return all appointments", async () => {
-      const appointments = [createMockAppointment()];
-      appointmentRepo.findAll.mockResolvedValue(appointments);
+    it("should return all lessons", async () => {
+      const lessons = [createMockAppointment()];
+      appointmentRepo.findAll.mockResolvedValue(lessons);
 
       const result = await service.findAllAppointments();
-      expect(result).toEqual(appointments);
+      expect(result).toEqual(lessons);
       expect(appointmentRepo.findAll).toHaveBeenCalledWith({
         populate: ["students", "tutor", "course"],
         orderBy: { startTime: "ASC" },
@@ -212,7 +217,7 @@ describe("SchedulingService", () => {
   });
 
   describe("findAppointmentById", () => {
-    it("should return appointment when found", async () => {
+    it("should return lesson when found", async () => {
       const appt = createMockAppointment();
       appointmentRepo.findOne.mockResolvedValue(appt);
 
@@ -251,13 +256,13 @@ describe("SchedulingService", () => {
   });
 
   describe("findUpcomingAppointmentsByStudent", () => {
-    it("should filter by future scheduled appointments through ManyToMany", async () => {
+    it("should filter by future scheduled lessons through ManyToMany", async () => {
       appointmentRepo.find.mockResolvedValue([]);
       await service.findUpcomingAppointmentsByStudent("stu-1");
       expect(appointmentRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
           students: "stu-1",
-          status: AppointmentStatus.SCHEDULED,
+          status: LessonStatus.SCHEDULED,
         }),
         expect.objectContaining({ orderBy: { startTime: "ASC" } }),
       );
@@ -265,13 +270,13 @@ describe("SchedulingService", () => {
   });
 
   describe("findUpcomingAppointmentsByTutor", () => {
-    it("should filter by future scheduled appointments for tutor", async () => {
+    it("should filter by future scheduled lessons for tutor", async () => {
       appointmentRepo.find.mockResolvedValue([]);
       await service.findUpcomingAppointmentsByTutor("tut-1");
       expect(appointmentRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
           tutor: "tut-1",
-          status: AppointmentStatus.SCHEDULED,
+          status: LessonStatus.SCHEDULED,
         }),
         expect.objectContaining({ orderBy: { startTime: "ASC" } }),
       );
@@ -321,7 +326,7 @@ describe("SchedulingService", () => {
       appointmentRepo.count.mockResolvedValue(0);
     });
 
-    it("should create an appointment with google calendar event", async () => {
+    it("should create an lesson with google calendar event", async () => {
       const result = await service.createAppointment(dto);
 
       expect(result).toBeDefined();
@@ -369,7 +374,7 @@ describe("SchedulingService", () => {
       );
     });
 
-    it("should not fail appointment creation when email fails", async () => {
+    it("should not fail lesson creation when email fails", async () => {
       emailService.sendClassConfirmationEmail.mockRejectedValue(
         new Error("SMTP down"),
       );
@@ -412,7 +417,7 @@ describe("SchedulingService", () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
 
       await service.updateAppointment("appt-1", {
-        status: AppointmentStatus.CANCELLED,
+        status: LessonStatus.CANCELLED,
       });
       expect(googleCalendar.deleteEvent).toHaveBeenCalledWith("gcal-1");
     });
@@ -438,7 +443,7 @@ describe("SchedulingService", () => {
       const result = await service.cancelAppointment("appt-1", {
         creditHoursBack: false,
       });
-      expect(result.status).toBe(AppointmentStatus.CANCELLED);
+      expect(result.status).toBe(LessonStatus.CANCELLED);
       expect(googleCalendar.deleteEvent).toHaveBeenCalledWith("gcal-1");
       expect(emailService.sendClassCancellationEmail).toHaveBeenCalledWith(
         appt,
@@ -455,7 +460,7 @@ describe("SchedulingService", () => {
       const result = await service.cancelAppointment("appt-1", {
         creditHoursBack: false,
       });
-      expect(result.status).toBe(AppointmentStatus.CANCELLED);
+      expect(result.status).toBe(LessonStatus.CANCELLED);
     });
 
     it("should cancel and credit hours back to course when creditHoursBack is true", async () => {
@@ -468,7 +473,7 @@ describe("SchedulingService", () => {
         creditHoursBack: true,
       });
 
-      expect(result.status).toBe(AppointmentStatus.CANCELLED);
+      expect(result.status).toBe(LessonStatus.CANCELLED);
       expect(result.creditedBack).toBe(true);
       expect(course.hoursBalance).toBe(6); // 5 + 1 hour
     });
@@ -483,7 +488,7 @@ describe("SchedulingService", () => {
         creditHoursBack: false,
       });
 
-      expect(result.status).toBe(AppointmentStatus.CANCELLED);
+      expect(result.status).toBe(LessonStatus.CANCELLED);
       expect(result.creditedBack).toBe(false);
       expect(course.hoursBalance).toBe(5); // unchanged
     });
@@ -495,7 +500,7 @@ describe("SchedulingService", () => {
       appointmentRepo.findOne.mockResolvedValue(appt);
 
       const result = await service.completeAppointment("appt-1");
-      expect(result.status).toBe(AppointmentStatus.COMPLETED);
+      expect(result.status).toBe(LessonStatus.COMPLETED);
       expect(googleCalendar.updateEvent).toHaveBeenCalledWith(
         "gcal-1",
         expect.objectContaining({
@@ -630,7 +635,7 @@ describe("SchedulingService", () => {
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
-    it("should throw NotFoundException if appointment not found", async () => {
+    it("should throw NotFoundException if lesson not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createAttendance({
@@ -669,12 +674,12 @@ describe("SchedulingService", () => {
   });
 
   describe("findAttendanceByAppointment", () => {
-    it("should query by appointment id", async () => {
+    it("should query by lesson id", async () => {
       attendanceRepo.findOne.mockResolvedValue(null);
       await service.findAttendanceByAppointment("appt-1");
       expect(attendanceRepo.findOne).toHaveBeenCalledWith(
-        { appointment: "appt-1" },
-        expect.objectContaining({ populate: ["appointment", "student"] }),
+        { lesson: "appt-1" },
+        expect.objectContaining({ populate: ["lesson", "student"] }),
       );
     });
   });
@@ -685,7 +690,7 @@ describe("SchedulingService", () => {
       await service.findAttendanceByStudent("stu-1");
       expect(attendanceRepo.find).toHaveBeenCalledWith(
         { student: "stu-1" },
-        expect.objectContaining({ populate: ["appointment", "student"] }),
+        expect.objectContaining({ populate: ["lesson", "student"] }),
       );
     });
   });
@@ -741,7 +746,7 @@ describe("SchedulingService", () => {
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
-    it("should throw NotFoundException if appointment not found", async () => {
+    it("should throw NotFoundException if lesson not found", async () => {
       appointmentRepo.findOne.mockResolvedValue(null);
       await expect(
         service.createClassReport({
@@ -783,12 +788,12 @@ describe("SchedulingService", () => {
   });
 
   describe("findClassReportByAppointment", () => {
-    it("should query by appointment id", async () => {
+    it("should query by lesson id", async () => {
       classReportRepo.findOne.mockResolvedValue(null);
       await service.findClassReportByAppointment("appt-1");
       expect(classReportRepo.findOne).toHaveBeenCalledWith(
-        { appointment: "appt-1" },
-        expect.objectContaining({ populate: ["appointment", "tutor"] }),
+        { lesson: "appt-1" },
+        expect.objectContaining({ populate: ["lesson", "tutor"] }),
       );
     });
   });
@@ -799,7 +804,7 @@ describe("SchedulingService", () => {
       await service.findClassReportsByTutor("tut-1");
       expect(classReportRepo.find).toHaveBeenCalledWith(
         { tutor: "tut-1" },
-        expect.objectContaining({ populate: ["appointment", "tutor"] }),
+        expect.objectContaining({ populate: ["lesson", "tutor"] }),
       );
     });
   });
@@ -847,17 +852,17 @@ describe("SchedulingService", () => {
   describe("getSchedulingStats", () => {
     it("should return correct stats", async () => {
       const appt1 = createMockAppointment({
-        status: AppointmentStatus.COMPLETED,
+        status: LessonStatus.COMPLETED,
         startTime: new Date("2026-03-01T10:00:00Z"),
         endTime: new Date("2026-03-01T11:00:00Z"),
       });
       const appt2 = createMockAppointment({
-        status: AppointmentStatus.SCHEDULED,
+        status: LessonStatus.SCHEDULED,
         startTime: new Date("2026-12-01T10:00:00Z"),
         endTime: new Date("2026-12-01T12:00:00Z"),
       });
 
-      // upcoming appointments
+      // upcoming lessons
       appointmentRepo.find.mockResolvedValueOnce([appt2]); // upcoming
       appointmentRepo.count.mockResolvedValueOnce(3); // completedThisMonth
       appointmentRepo.find.mockResolvedValueOnce([appt1]); // completed
@@ -882,14 +887,12 @@ describe("SchedulingService", () => {
       attendanceRepo.count
         .mockResolvedValueOnce(10) // total
         .mockResolvedValueOnce(7) // present
-        .mockResolvedValueOnce(2) // absent
-        .mockResolvedValueOnce(1); // on_time_cancellation
+        .mockResolvedValueOnce(3); // absent
 
       const result = await service.getAttendanceStats("stu-1");
       expect(result.totalAttendance).toBe(10);
       expect(result.presentCount).toBe(7);
-      expect(result.absentCount).toBe(2);
-      expect(result.onTimeCancellationCount).toBe(1);
+      expect(result.absentCount).toBe(3);
       expect(result.attendanceRate).toBe(70);
     });
 

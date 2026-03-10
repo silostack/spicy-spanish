@@ -5,11 +5,11 @@ import { Transaction } from "./entities/transaction.entity";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 import { User } from "../users/entities/user.entity";
-import { Appointment } from "../scheduling/entities/appointment.entity";
+import { Lesson } from "../scheduling/entities/lesson.entity";
 
 @Module({
   imports: [
-    MikroOrmModule.forFeature([Package, Transaction, User, Appointment]),
+    MikroOrmModule.forFeature([Package, Transaction, User, Lesson]),
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService],

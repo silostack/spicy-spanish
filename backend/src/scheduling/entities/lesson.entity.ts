@@ -11,7 +11,7 @@ import { v4 } from "uuid";
 import { User } from "../../users/entities/user.entity";
 import { Course } from "../../courses/entities/course.entity";
 
-export enum AppointmentStatus {
+export enum LessonStatus {
   SCHEDULED = "scheduled",
   COMPLETED = "completed",
   CANCELLED = "cancelled",
@@ -19,7 +19,7 @@ export enum AppointmentStatus {
 }
 
 @Entity()
-export class Appointment {
+export class Lesson {
   @PrimaryKey()
   id: string = v4();
 
@@ -38,8 +38,8 @@ export class Appointment {
   @Property()
   endTime: Date;
 
-  @Enum(() => AppointmentStatus)
-  status: AppointmentStatus = AppointmentStatus.SCHEDULED;
+  @Enum(() => LessonStatus)
+  status: LessonStatus = LessonStatus.SCHEDULED;
 
   @Property({ nullable: true })
   googleCalendarEventId?: string;
@@ -76,7 +76,7 @@ export class Appointment {
     course: Course,
     startTime: Date,
     endTime: Date,
-    status: AppointmentStatus = AppointmentStatus.SCHEDULED,
+    status: LessonStatus = LessonStatus.SCHEDULED,
   ) {
     this.tutor = tutor;
     this.course = course;

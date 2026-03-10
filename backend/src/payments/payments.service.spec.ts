@@ -11,7 +11,7 @@ import {
   PaymentMethod,
 } from "./entities/transaction.entity";
 import { User, UserRole } from "../users/entities/user.entity";
-import { AppointmentStatus } from "../scheduling/entities/appointment.entity";
+import { LessonStatus } from "../scheduling/entities/lesson.entity";
 
 // ---------------------------------------------------------------------------
 // Mock Stripe
@@ -646,7 +646,7 @@ describe("PaymentsService", () => {
   // -----------------------------------------------------------------------
 
   describe("getStudentBalance", () => {
-    it("should calculate balance from transactions and appointments", async () => {
+    it("should calculate balance from transactions and lessons", async () => {
       const student = createMockUser({ id: "stu-1", role: UserRole.STUDENT });
       userRepo.findOne.mockResolvedValue(student);
 
@@ -662,22 +662,22 @@ describe("PaymentsService", () => {
         }),
       ]);
 
-      // 3 completed appointments totalling 3 hours
+      // 3 completed lessons totalling 3 hours
       em.find.mockResolvedValue([
         {
           startTime: new Date("2026-03-01T10:00:00Z"),
           endTime: new Date("2026-03-01T11:00:00Z"),
-          status: AppointmentStatus.COMPLETED,
+          status: LessonStatus.COMPLETED,
         },
         {
           startTime: new Date("2026-03-02T10:00:00Z"),
           endTime: new Date("2026-03-02T11:00:00Z"),
-          status: AppointmentStatus.COMPLETED,
+          status: LessonStatus.COMPLETED,
         },
         {
           startTime: new Date("2026-03-03T10:00:00Z"),
           endTime: new Date("2026-03-03T11:00:00Z"),
-          status: AppointmentStatus.COMPLETED,
+          status: LessonStatus.COMPLETED,
         },
       ]);
 
@@ -687,7 +687,7 @@ describe("PaymentsService", () => {
       expect(result.availableHours).toBe(12);
     });
 
-    it("should return zero balance when no transactions or appointments", async () => {
+    it("should return zero balance when no transactions or lessons", async () => {
       const student = createMockUser({ id: "stu-1", role: UserRole.STUDENT });
       userRepo.findOne.mockResolvedValue(student);
       transactionRepo.find.mockResolvedValue([]);

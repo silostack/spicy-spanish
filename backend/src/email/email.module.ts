@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 import { MikroOrmModule } from "@mikro-orm/nestjs";
 import { EmailService } from "./email.service";
-import { Appointment } from "../scheduling/entities/appointment.entity";
+import { Lesson } from "../scheduling/entities/lesson.entity";
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Appointment])],
+  imports: [MikroOrmModule.forFeature([Lesson])],
   providers: [EmailService],
   exports: [EmailService],
 })

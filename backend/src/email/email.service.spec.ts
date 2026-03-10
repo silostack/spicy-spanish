@@ -3,7 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { getRepositoryToken } from "@mikro-orm/nestjs";
 import { EntityManager } from "@mikro-orm/core";
 import { EmailService } from "./email.service";
-import { Appointment } from "../scheduling/entities/appointment.entity";
+import { Lesson } from "../scheduling/entities/lesson.entity";
 import { User } from "../users/entities/user.entity";
 import {
   Transaction,
@@ -54,7 +54,7 @@ describe("EmailService", () => {
           },
         },
         {
-          provide: getRepositoryToken(Appointment),
+          provide: getRepositoryToken(Lesson),
           useValue: mockAppointmentRepo,
         },
         {
@@ -138,16 +138,16 @@ describe("EmailService", () => {
 
   describe("sendClassReminder", () => {
     it("should send reminder to student", async () => {
-      const appointment = {
+      const lesson = {
         students: {
           getItems: () => [{ firstName: "John", email: "john@test.com" }],
         },
         tutor: { fullName: "Maria Garcia" },
         startTime: new Date("2026-03-01T14:00:00Z"),
         endTime: new Date("2026-03-01T15:00:00Z"),
-      } as unknown as Appointment;
+      } as unknown as Lesson;
 
-      await service.sendClassReminder(appointment);
+      await service.sendClassReminder(lesson);
 
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -183,7 +183,7 @@ describe("EmailService", () => {
 
   describe("sendClassConfirmationEmail", () => {
     it("should send confirmation to both student and tutor", async () => {
-      const appointment = {
+      const lesson = {
         students: {
           getItems: () => [
             { firstName: "John", fullName: "John Doe", email: "john@test.com" },
@@ -196,9 +196,9 @@ describe("EmailService", () => {
         },
         startTime: new Date("2026-03-01T14:00:00Z"),
         endTime: new Date("2026-03-01T15:00:00Z"),
-      } as unknown as Appointment;
+      } as unknown as Lesson;
 
-      await service.sendClassConfirmationEmail(appointment);
+      await service.sendClassConfirmationEmail(lesson);
 
       expect(mockTransporter.sendMail).toHaveBeenCalledTimes(2);
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
@@ -218,7 +218,7 @@ describe("EmailService", () => {
 
   describe("sendClassCancellationEmail", () => {
     it("should send cancellation to both student and tutor", async () => {
-      const appointment = {
+      const lesson = {
         students: {
           getItems: () => [
             { firstName: "John", fullName: "John Doe", email: "john@test.com" },
@@ -231,9 +231,9 @@ describe("EmailService", () => {
         },
         startTime: new Date("2026-03-01T14:00:00Z"),
         endTime: new Date("2026-03-01T15:00:00Z"),
-      } as unknown as Appointment;
+      } as unknown as Lesson;
 
-      await service.sendClassCancellationEmail(appointment);
+      await service.sendClassCancellationEmail(lesson);
 
       expect(mockTransporter.sendMail).toHaveBeenCalledTimes(2);
       expect(mockTransporter.sendMail).toHaveBeenCalledWith(
@@ -266,7 +266,7 @@ describe("EmailService", () => {
   });
 
   describe("sendScheduledReminders", () => {
-    it("should find and send reminders for upcoming appointments", async () => {
+    it("should find and send reminders for upcoming lessons", async () => {
       const mockAppointment = {
         id: "apt-1",
         students: {

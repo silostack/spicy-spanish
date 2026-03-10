@@ -1,17 +1,17 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { EntityManager, Collection } from "@mikro-orm/core";
 import { getRepositoryToken } from "@mikro-orm/nestjs";
-import { AppointmentGeneratorService } from "./appointment-generator.service";
+import { LessonGeneratorService } from "./lesson-generator.service";
 import { Course } from "../courses/entities/course.entity";
-import { Appointment } from "./entities/appointment.entity";
+import { Lesson } from "./entities/lesson.entity";
 import { UserRole } from "../users/entities/user.entity";
 
 type MockRepo = Record<string, jest.Mock>;
 
-describe("AppointmentGeneratorService", () => {
-  let service: AppointmentGeneratorService;
+describe("LessonGeneratorService", () => {
+  let service: LessonGeneratorService;
   let courseRepo: MockRepo;
-  let appointmentRepo: MockRepo;
+  let lessonRepo: MockRepo;
   let em: Record<string, jest.Mock>;
 
   const mockTutor = {
@@ -57,27 +57,26 @@ describe("AppointmentGeneratorService", () => {
       find: jest.fn(),
     };
 
-    appointmentRepo = {
+    lessonRepo = {
       findOne: jest.fn(),
       count: jest.fn(),
     };
 
     em = {
       persistAndFlush: jest.fn(),
-      flush: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AppointmentGeneratorService,
+        LessonGeneratorService,
         { provide: getRepositoryToken(Course), useValue: courseRepo },
-        { provide: getRepositoryToken(Appointment), useValue: appointmentRepo },
+        { provide: getRepositoryToken(Lesson), useValue: lessonRepo },
         { provide: EntityManager, useValue: em },
       ],
     }).compile();
 
-    service = module.get<AppointmentGeneratorService>(
-      AppointmentGeneratorService,
+    service = module.get<LessonGeneratorService>(
+      LessonGeneratorService,
     );
   });
 
@@ -85,12 +84,11 @@ describe("AppointmentGeneratorService", () => {
     expect(service).toBeDefined();
   });
 
-  describe("generateAppointments", () => {
-    it("should generate appointments for active courses with schedules", async () => {
+  describe("generateLessons", () => {
+    it("should generate lessons for active courses with schedules", async () => {
       courseRepo.find.mockResolvedValue([mockCourse]);
-      appointmentRepo.count.mockResolvedValue(0); // no existing appointments
+      lessonRepo.count.mockResolvedValue(0); // no existing lessons
       em.persistAndFlush.mockResolvedValue(undefined);
-      em.flush.mockResolvedValue(undefined);
 
       await service.generateAppointments();
 
@@ -98,7 +96,7 @@ describe("AppointmentGeneratorService", () => {
         { isActive: true },
         { populate: ["tutor", "students", "schedules"] },
       );
-      // Should have created appointments (exact count depends on how many Wednesdays in 4 weeks)
+      // Should have created lessons (exact count depends on how many Wednesdays in 4 weeks)
       expect(em.persistAndFlush).toHaveBeenCalled();
     });
 
@@ -111,42 +109,39 @@ describe("AppointmentGeneratorService", () => {
 
       await service.generateAppointments();
 
-      // No appointments should be generated since start date is in the future
+      // No lessons should be generated since start date is in the future
       expect(em.persistAndFlush).not.toHaveBeenCalled();
     });
 
-    it("should skip slots where an appointment already exists", async () => {
+    it("should skip slots where an lesson already exists", async () => {
       courseRepo.find.mockResolvedValue([mockCourse]);
-      appointmentRepo.count.mockResolvedValue(1); // appointment already exists
+      lessonRepo.count.mockResolvedValue(1); // lesson already exists
 
       await service.generateAppointments();
 
       expect(em.persistAndFlush).not.toHaveBeenCalled();
     });
 
-    it("should deduct hours from course balance", async () => {
+    it("should not deduct hours from course balance", async () => {
       const course = { ...mockCourse, hoursBalance: 10 };
       courseRepo.find.mockResolvedValue([course]);
-      appointmentRepo.count.mockResolvedValue(0);
+      lessonRepo.count.mockResolvedValue(0);
       em.persistAndFlush.mockResolvedValue(undefined);
-      em.flush.mockResolvedValue(undefined);
 
       await service.generateAppointments();
 
-      // hoursBalance should be reduced
-      expect(course.hoursBalance).toBeLessThan(10);
+      expect(course.hoursBalance).toBe(10);
     });
 
-    it("should set needsRenewal when balance reaches zero", async () => {
+    it("should not toggle needsRenewal based on generated lessons", async () => {
       const course = { ...mockCourse, hoursBalance: 1, needsRenewal: false };
       courseRepo.find.mockResolvedValue([course]);
-      appointmentRepo.count.mockResolvedValue(0);
+      lessonRepo.count.mockResolvedValue(0);
       em.persistAndFlush.mockResolvedValue(undefined);
-      em.flush.mockResolvedValue(undefined);
 
       await service.generateAppointments();
 
-      expect(course.needsRenewal).toBe(true);
+      expect(course.needsRenewal).toBe(false);
     });
   });
 });

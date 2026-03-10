@@ -8,16 +8,20 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from "@nestjs/common";
+import type { Request } from "express";
 import { SchedulingService } from "./scheduling.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
-import { UserRole } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import {
-  CreateAppointmentDto,
-  UpdateAppointmentDto,
-  CancelAppointmentDto,
+  CreateLessonDto,
+  UpdateLessonDto,
+  CancelLessonDto,
+  CompleteLessonDto,
+  RescheduleLessonDto,
   CreateAvailabilityDto,
   UpdateAvailabilityDto,
   CreateAttendanceDto,
@@ -31,63 +35,84 @@ import {
 export class SchedulingController {
   constructor(private readonly schedulingService: SchedulingService) {}
 
-  // Appointment endpoints
-  @Get("appointments")
+  // Lesson endpoints
+  @Get("lessons")
   @Roles(UserRole.ADMIN)
-  async findAllAppointments() {
-    return this.schedulingService.findAllAppointments();
+  async findAllLessons() {
+    return this.schedulingService.findAllLessons();
   }
 
-  @Get("appointments/:id")
-  async findAppointmentById(@Param("id") id: string) {
-    return this.schedulingService.findAppointmentById(id);
+  @Get("lessons/:id")
+  async findLessonById(@Param("id") id: string) {
+    return this.schedulingService.findLessonById(id);
   }
 
-  @Get("students/:id/appointments")
-  async findAppointmentsByStudent(@Param("id") id: string) {
-    return this.schedulingService.findAppointmentsByStudent(id);
-  }
-
-  @Get("tutors/:id/appointments")
-  async findAppointmentsByTutor(@Param("id") id: string) {
-    return this.schedulingService.findAppointmentsByTutor(id);
-  }
-
-  @Get("students/:id/upcoming-appointments")
-  async findUpcomingAppointmentsByStudent(@Param("id") id: string) {
-    return this.schedulingService.findUpcomingAppointmentsByStudent(id);
-  }
-
-  @Get("tutors/:id/upcoming-appointments")
-  async findUpcomingAppointmentsByTutor(@Param("id") id: string) {
-    return this.schedulingService.findUpcomingAppointmentsByTutor(id);
-  }
-
-  @Post("appointments")
-  async createAppointment(@Body() createAppointmentDto: CreateAppointmentDto) {
-    return this.schedulingService.createAppointment(createAppointmentDto);
-  }
-
-  @Patch("appointments/:id")
-  async updateAppointment(
-    @Param("id") id: string,
-    @Body() updateAppointmentDto: UpdateAppointmentDto,
+  @Get("courses/:courseId/lessons")
+  async findLessonsByCourse(
+    @Param("courseId") courseId: string,
+    @Req() req: Request & { user: User },
   ) {
-    return this.schedulingService.updateAppointment(id, updateAppointmentDto);
+    return this.schedulingService.findLessonsByCourse(courseId, req.user);
   }
 
-  @Patch("appointments/:id/cancel")
-  async cancelAppointment(
+  @Get("students/:id/lessons")
+  async findLessonsByStudent(@Param("id") id: string) {
+    return this.schedulingService.findLessonsByStudent(id);
+  }
+
+  @Get("tutors/:id/lessons")
+  async findLessonsByTutor(@Param("id") id: string) {
+    return this.schedulingService.findLessonsByTutor(id);
+  }
+
+  @Get("students/:id/upcoming-lessons")
+  async findUpcomingLessonsByStudent(@Param("id") id: string) {
+    return this.schedulingService.findUpcomingLessonsByStudent(id);
+  }
+
+  @Get("tutors/:id/upcoming-lessons")
+  async findUpcomingLessonsByTutor(@Param("id") id: string) {
+    return this.schedulingService.findUpcomingLessonsByTutor(id);
+  }
+
+  @Post("lessons")
+  async createLesson(@Body() createLessonDto: CreateLessonDto) {
+    return this.schedulingService.createLesson(createLessonDto);
+  }
+
+  @Patch("lessons/:id")
+  async updateLesson(
     @Param("id") id: string,
-    @Body() dto: CancelAppointmentDto,
+    @Body() updateLessonDto: UpdateLessonDto,
   ) {
-    return this.schedulingService.cancelAppointment(id, dto);
+    return this.schedulingService.updateLesson(id, updateLessonDto);
   }
 
-  @Patch("appointments/:id/complete")
+  @Patch("lessons/:id/reschedule")
   @Roles(UserRole.TUTOR, UserRole.ADMIN)
-  async completeAppointment(@Param("id") id: string) {
-    return this.schedulingService.completeAppointment(id);
+  async rescheduleLesson(
+    @Param("id") id: string,
+    @Body() dto: RescheduleLessonDto,
+  ) {
+    return this.schedulingService.rescheduleLesson(id, dto);
+  }
+
+  @Patch("lessons/:id/cancel")
+  async cancelLesson(
+    @Param("id") id: string,
+    @Body() dto: CancelLessonDto,
+  ) {
+    return this.schedulingService.cancelLesson(id, dto);
+  }
+
+  @Post("lessons/:id/complete")
+  @Roles(UserRole.TUTOR, UserRole.ADMIN)
+  async completeLesson(
+    @Param("id") id: string,
+    @Body() dto: CompleteLessonDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.schedulingService.completeLesson(id, dto, req.user);
   }
 
   // Availability endpoints
@@ -131,11 +156,9 @@ export class SchedulingController {
     return this.schedulingService.createAttendance(createAttendanceDto);
   }
 
-  @Get("attendance/appointment/:appointmentId")
-  async getAttendanceByAppointment(
-    @Param("appointmentId") appointmentId: string,
-  ) {
-    return this.schedulingService.findAttendanceByAppointment(appointmentId);
+  @Get("attendance/lesson/:lessonId")
+  async getAttendanceByLesson(@Param("lessonId") lessonId: string) {
+    return this.schedulingService.findAttendanceByLesson(lessonId);
   }
 
   @Get("attendance/student/:studentId")
@@ -169,11 +192,9 @@ export class SchedulingController {
     return this.schedulingService.createClassReport(createClassReportDto);
   }
 
-  @Get("class-reports/appointment/:appointmentId")
-  async getClassReportByAppointment(
-    @Param("appointmentId") appointmentId: string,
-  ) {
-    return this.schedulingService.findClassReportByAppointment(appointmentId);
+  @Get("class-reports/lesson/:lessonId")
+  async getClassReportByLesson(@Param("lessonId") lessonId: string) {
+    return this.schedulingService.findClassReportByLesson(lessonId);
   }
 
   @Get("class-reports/tutor/:tutorId")

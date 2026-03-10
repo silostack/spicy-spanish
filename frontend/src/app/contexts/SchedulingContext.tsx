@@ -27,8 +27,6 @@ interface Availability {
 interface Course {
   id: string;
   title: string;
-  description: string;
-  learningLevel: 'beginner' | 'intermediate' | 'advanced';
 }
 
 interface Appointment {
@@ -147,11 +145,11 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       let endpoint = '';
       
       if (user.role === 'student') {
-        endpoint = `/scheduling/students/${user.id}/appointments`;
+        endpoint = `/scheduling/students/${user.id}/lessons`;
       } else if (user.role === 'tutor') {
-        endpoint = `/scheduling/tutors/${user.id}/appointments`;
+        endpoint = `/scheduling/tutors/${user.id}/lessons`;
       } else if (user.role === 'admin') {
-        endpoint = '/scheduling/appointments';
+        endpoint = '/scheduling/lessons';
       }
       
       const response = await api.get(endpoint, {
@@ -163,7 +161,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       setAppointments(response.data);
     } catch (error) {
 
-      setError('Failed to fetch appointments');
+      setError('Failed to fetch lessons');
     } finally {
       setIsLoading(false);
     }
@@ -179,13 +177,20 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const fetchCourses = async () => {
-    if (!token) return;
+    if (!token || !user) return;
     
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await api.get('/courses/active', {
+      let endpoint = '/courses';
+      if (user.role === 'tutor') {
+        endpoint = `/courses/tutor/${user.id}`;
+      } else if (user.role === 'student') {
+        endpoint = `/courses/student/${user.id}`;
+      }
+
+      const response = await api.get(endpoint, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -209,7 +214,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const bookAppointment = async (notes?: string) => {
-    if (!token || !user || !selectedTutor || !selectedDay || !selectedTimeSlot) {
+    if (!token || !user || !selectedTutor || !selectedDay || !selectedTimeSlot || !selectedCourse) {
       setError('Missing required booking information');
       return;
     }
@@ -218,21 +223,11 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
       
-      // Combine date and time for start and end
-      const startDate = new Date(selectedDay);
-      const endDate = new Date(selectedDay);
-      
-      const [startHour, startMinute] = selectedTimeSlot.start.split(':').map(Number);
-      const [endHour, endMinute] = selectedTimeSlot.end.split(':').map(Number);
-      
-      startDate.setHours(startHour, startMinute, 0, 0);
-      endDate.setHours(endHour, endMinute, 0, 0);
-      
-      await api.post('/scheduling/appointments', {
-        studentId: user.id,
+      await api.post('/scheduling/lessons', {
+        studentIds: [user.id],
         tutorId: selectedTutor.id,
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
+        startTime: selectedTimeSlot.start,
+        endTime: selectedTimeSlot.end,
         courseId: selectedCourse?.id,
         notes,
       }, {
@@ -250,15 +245,15 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       await fetchAppointments();
       
       addNotification({
-        message: 'Appointment booked successfully',
+        message: 'Lesson booked successfully',
         type: 'success',
       });
     } catch (error) {
 
-      setError('Failed to book appointment');
+      setError('Failed to book lesson');
       
       addNotification({
-        message: 'Failed to book appointment',
+        message: 'Failed to book lesson',
         type: 'error',
       });
     } finally {
@@ -273,7 +268,7 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
 
-      await api.patch(`/scheduling/appointments/${appointmentId}/cancel`, { creditHoursBack }, {
+      await api.patch(`/scheduling/lessons/${appointmentId}/cancel`, { creditHoursBack }, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -283,15 +278,15 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
       await fetchAppointments();
       
       addNotification({
-        message: 'Appointment cancelled successfully',
+        message: 'Lesson cancelled successfully',
         type: 'success',
       });
     } catch (error) {
 
-      setError('Failed to cancel appointment');
+      setError('Failed to cancel lesson');
       
       addNotification({
-        message: 'Failed to cancel appointment',
+        message: 'Failed to cancel lesson',
         type: 'error',
       });
     } finally {
@@ -302,7 +297,9 @@ export const SchedulingProvider: React.FC<{ children: ReactNode }> = ({ children
   // Fetch initial data if user is logged in
   useEffect(() => {
     if (token && user) {
-      fetchTutors();
+      if (user.role === 'student' || user.role === 'admin') {
+        fetchTutors();
+      }
       fetchAppointments();
     }
   }, [token, user]);

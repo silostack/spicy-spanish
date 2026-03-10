@@ -7,9 +7,9 @@ import * as nodemailer from "nodemailer";
 import * as handlebars from "handlebars";
 import { User } from "../users/entities/user.entity";
 import {
-  Appointment,
-  AppointmentStatus,
-} from "../scheduling/entities/appointment.entity";
+  Lesson,
+  LessonStatus,
+} from "../scheduling/entities/lesson.entity";
 import { Transaction } from "../payments/entities/transaction.entity";
 
 @Injectable()
@@ -19,8 +19,8 @@ export class EmailService {
 
   constructor(
     private configService: ConfigService,
-    @InjectRepository(Appointment)
-    private readonly appointmentRepository: EntityRepository<Appointment>,
+    @InjectRepository(Lesson)
+    private readonly appointmentRepository: EntityRepository<Lesson>,
     private readonly em: EntityManager,
   ) {
     this.transporter = nodemailer.createTransport({
@@ -118,10 +118,10 @@ export class EmailService {
     });
   }
 
-  async sendClassReminder(appointment: Appointment): Promise<void> {
-    const students = appointment.students.getItems();
+  async sendClassReminder(lesson: Lesson): Promise<void> {
+    const students = lesson.students.getItems();
     const student = students[0];
-    const tutor = appointment.tutor;
+    const tutor = lesson.tutor;
 
     const template = `
       <h1>Reminder: Upcoming Spanish Class</h1>
@@ -136,8 +136,8 @@ export class EmailService {
       <p>¡Hasta pronto!</p>
     `;
 
-    const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
+    const startTime = new Date(lesson.startTime);
+    const endTime = new Date(lesson.endTime);
 
     const compiledTemplate = handlebars.compile(template);
     const html = compiledTemplate({
@@ -196,10 +196,10 @@ export class EmailService {
     });
   }
 
-  async sendClassConfirmationEmail(appointment: Appointment): Promise<void> {
-    const students = appointment.students.getItems();
+  async sendClassConfirmationEmail(lesson: Lesson): Promise<void> {
+    const students = lesson.students.getItems();
     const student = students[0];
-    const tutor = appointment.tutor;
+    const tutor = lesson.tutor;
 
     const template = `
       <h1>Spanish Class Confirmation</h1>
@@ -217,8 +217,8 @@ export class EmailService {
       <p>¡Hasta pronto!</p>
     `;
 
-    const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
+    const startTime = new Date(lesson.startTime);
+    const endTime = new Date(lesson.endTime);
     const durationHours =
       (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
 
@@ -285,10 +285,10 @@ export class EmailService {
     });
   }
 
-  async sendClassCancellationEmail(appointment: Appointment): Promise<void> {
-    const students = appointment.students.getItems();
+  async sendClassCancellationEmail(lesson: Lesson): Promise<void> {
+    const students = lesson.students.getItems();
     const student = students[0];
-    const tutor = appointment.tutor;
+    const tutor = lesson.tutor;
 
     const template = `
       <h1>Spanish Class Cancellation</h1>
@@ -304,8 +304,8 @@ export class EmailService {
       <p>If you have any questions, please contact us.</p>
     `;
 
-    const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
+    const startTime = new Date(lesson.startTime);
+    const endTime = new Date(lesson.endTime);
 
     // Send to student
     const studentHtml = handlebars.compile(template)({
@@ -352,7 +352,7 @@ export class EmailService {
     });
   }
 
-  // Scheduled task that runs every 5 minutes to check for upcoming appointments
+  // Scheduled task that runs every 5 minutes to check for upcoming lessons
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sendScheduledReminders(): Promise<void> {
     // Use a forked EntityManager for the scheduled task
@@ -361,7 +361,7 @@ export class EmailService {
     try {
       this.logger.log("Running scheduled email reminders check");
 
-      // Get appointments starting in the next hour
+      // Get lessons starting in the next hour
       const now = new Date();
       const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
       const reminder = await this.findUpcomingAppointmentsForReminder(
@@ -372,23 +372,23 @@ export class EmailService {
 
       if (reminder.length > 0) {
         this.logger.log(
-          `Sending reminders for ${reminder.length} upcoming appointments`,
+          `Sending reminders for ${reminder.length} upcoming lessons`,
         );
 
-        for (const appointment of reminder) {
+        for (const lesson of reminder) {
           try {
-            await this.sendClassReminder(appointment);
-            await this.markReminderSent(em, appointment.id);
-            this.logger.log(`Sent reminder for appointment ${appointment.id}`);
+            await this.sendClassReminder(lesson);
+            await this.markReminderSent(em, lesson.id);
+            this.logger.log(`Sent reminder for lesson ${lesson.id}`);
           } catch (error) {
             this.logger.error(
-              `Failed to send reminder for appointment ${appointment.id}: ${error.message}`,
+              `Failed to send reminder for lesson ${lesson.id}: ${error.message}`,
             );
           }
         }
       }
 
-      // Get appointments for 24 hour reminder
+      // Get lessons for 24 hour reminder
       const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       const dayBefore = await this.findUpcomingAppointmentsForDayBeforeReminder(
         em,
@@ -398,19 +398,19 @@ export class EmailService {
 
       if (dayBefore.length > 0) {
         this.logger.log(
-          `Sending day-before reminders for ${dayBefore.length} appointments`,
+          `Sending day-before reminders for ${dayBefore.length} lessons`,
         );
 
-        for (const appointment of dayBefore) {
+        for (const lesson of dayBefore) {
           try {
-            await this.sendDayBeforeReminder(appointment);
-            await this.markDayBeforeReminderSent(em, appointment.id);
+            await this.sendDayBeforeReminder(lesson);
+            await this.markDayBeforeReminderSent(em, lesson.id);
             this.logger.log(
-              `Sent day-before reminder for appointment ${appointment.id}`,
+              `Sent day-before reminder for lesson ${lesson.id}`,
             );
           } catch (error) {
             this.logger.error(
-              `Failed to send day-before reminder for appointment ${appointment.id}: ${error.message}`,
+              `Failed to send day-before reminder for lesson ${lesson.id}: ${error.message}`,
             );
           }
         }
@@ -422,17 +422,17 @@ export class EmailService {
     }
   }
 
-  // Method to find appointments that need reminders sent
+  // Method to find lessons that need reminders sent
   private async findUpcomingAppointmentsForReminder(
     em: EntityManager,
     now: Date,
     cutoff: Date,
-  ): Promise<Appointment[]> {
+  ): Promise<Lesson[]> {
     return em.find(
-      Appointment,
+      Lesson,
       {
         startTime: { $gte: now, $lte: cutoff },
-        status: AppointmentStatus.SCHEDULED,
+        status: LessonStatus.SCHEDULED,
         reminderSent: false,
       },
       {
@@ -441,17 +441,17 @@ export class EmailService {
     );
   }
 
-  // Method to find appointments that need day-before reminders sent
+  // Method to find lessons that need day-before reminders sent
   private async findUpcomingAppointmentsForDayBeforeReminder(
     em: EntityManager,
     now: Date,
     cutoff: Date,
-  ): Promise<Appointment[]> {
+  ): Promise<Lesson[]> {
     return em.find(
-      Appointment,
+      Lesson,
       {
         startTime: { $gte: now, $lte: cutoff },
-        status: AppointmentStatus.SCHEDULED,
+        status: LessonStatus.SCHEDULED,
         dayBeforeReminderSent: false,
       },
       {
@@ -465,10 +465,10 @@ export class EmailService {
     em: EntityManager,
     appointmentId: string,
   ): Promise<void> {
-    const appointment = await em.findOne(Appointment, { id: appointmentId });
-    if (appointment) {
-      appointment.reminderSent = true;
-      appointment.reminderSentAt = new Date();
+    const lesson = await em.findOne(Lesson, { id: appointmentId });
+    if (lesson) {
+      lesson.reminderSent = true;
+      lesson.reminderSentAt = new Date();
       // Flush will be handled by the calling method
     }
   }
@@ -478,10 +478,10 @@ export class EmailService {
     em: EntityManager,
     appointmentId: string,
   ): Promise<void> {
-    const appointment = await em.findOne(Appointment, { id: appointmentId });
-    if (appointment) {
-      appointment.dayBeforeReminderSent = true;
-      appointment.dayBeforeReminderSentAt = new Date();
+    const lesson = await em.findOne(Lesson, { id: appointmentId });
+    if (lesson) {
+      lesson.dayBeforeReminderSent = true;
+      lesson.dayBeforeReminderSentAt = new Date();
       // Flush will be handled by the calling method
     }
   }
@@ -518,10 +518,10 @@ export class EmailService {
     });
   }
 
-  async sendDayBeforeReminder(appointment: Appointment): Promise<void> {
-    const students = appointment.students.getItems();
+  async sendDayBeforeReminder(lesson: Lesson): Promise<void> {
+    const students = lesson.students.getItems();
     const student = students[0];
-    const tutor = appointment.tutor;
+    const tutor = lesson.tutor;
 
     const template = `
       <h1>Reminder: Your Spanish Class Tomorrow</h1>
@@ -538,8 +538,8 @@ export class EmailService {
       <p>¡Hasta mañana!</p>
     `;
 
-    const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
+    const startTime = new Date(lesson.startTime);
+    const endTime = new Date(lesson.endTime);
 
     const compiledTemplate = handlebars.compile(template);
     const html = compiledTemplate({

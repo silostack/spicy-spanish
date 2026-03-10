@@ -14,9 +14,9 @@ import {
 } from "./entities/transaction.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
-  Appointment,
-  AppointmentStatus,
-} from "../scheduling/entities/appointment.entity";
+  Lesson,
+  LessonStatus,
+} from "../scheduling/entities/lesson.entity";
 import Stripe from "stripe";
 import {
   CreatePackageDto,
@@ -466,10 +466,10 @@ export class PaymentsService {
       0,
     );
 
-    // Hours used from completed appointments
-    const completedAppointments = await this.em.find(Appointment, {
+    // Hours used from completed lessons
+    const completedAppointments = await this.em.find(Lesson, {
       students: studentId,
-      status: AppointmentStatus.COMPLETED,
+      status: LessonStatus.COMPLETED,
     });
 
     const hoursUsed = completedAppointments.reduce((total, a) => {
