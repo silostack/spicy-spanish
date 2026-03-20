@@ -6,35 +6,35 @@ const logger = new Logger("PackageSeeder");
 
 export const defaultPackages = [
   {
-    name: "Starter Package",
+    name: "Basic Package",
     description:
-      "Perfect for beginners wanting to try out our Spanish lessons. Includes personalized lesson plans and progress tracking.",
-    hours: 4,
-    priceUsd: 49,
+      "A great way to get started with personalized Spanish lessons.",
+    hours: 5,
+    priceUsd: 143,
     isActive: true,
   },
   {
-    name: "Popular Package",
+    name: "Standard Package",
     description:
-      "Our most popular package for consistent learning. Ideal for students committed to regular practice and steady progress.",
-    hours: 8,
-    priceUsd: 89,
-    isActive: true,
-  },
-  {
-    name: "Intensive Package",
-    description:
-      "For serious learners who want to progress quickly. Includes priority scheduling and additional learning resources.",
-    hours: 16,
-    priceUsd: 159,
+      "Our most popular option for consistent progress.",
+    hours: 10,
+    priceUsd: 264,
     isActive: true,
   },
   {
     name: "Premium Package",
     description:
-      "Maximum flexibility and value for dedicated students. Includes all premium features and personalized curriculum design.",
-    hours: 32,
-    priceUsd: 299,
+      "For dedicated learners ready to accelerate their fluency.",
+    hours: 20,
+    priceUsd: 462,
+    isActive: true,
+  },
+  {
+    name: "Premium Plus",
+    description:
+      "The ultimate immersive experience — 3 months of intensive Spanish.",
+    hours: 90,
+    priceUsd: 1836,
     isActive: true,
   },
 ];

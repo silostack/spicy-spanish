@@ -193,7 +193,6 @@ export default function PrivacyPolicy() {
               </p>
               <div className="bg-gray-50 p-6 rounded-lg">
                 <p className="text-gray-700 mb-1"><span className="font-semibold">Privacy Team:</span> privacy@spicyspanish.com</p>
-                <p className="text-gray-700 mb-1"><span className="font-semibold">General Support:</span> support@spicyspanish.com</p>
                 <p className="text-gray-700">
                   You may also reach us through our{' '}
                   <Link href="/contact" className="text-spicy-red hover:text-spicy-orange underline">

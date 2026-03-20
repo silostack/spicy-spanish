@@ -29,7 +29,10 @@ export default function Header() {
             About
           </Link>
           <Link href="/tutors" className="text-spicy-dark hover:text-spicy-red font-medium">
-            Tutors
+            Our Team
+          </Link>
+          <Link href="/packages" className="text-spicy-dark hover:text-spicy-red font-medium">
+            Packages
           </Link>
           <Link href="/contact" className="text-spicy-dark hover:text-spicy-red font-medium">
             Contact
@@ -55,7 +58,8 @@ export default function Header() {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            className="h-6 w-6"
+            width="24"
+            height="24"
           >
             {isMenuOpen ? (
               <path
@@ -99,7 +103,14 @@ export default function Header() {
               className="text-spicy-dark hover:text-spicy-red font-medium"
               onClick={() => setIsMenuOpen(false)}
             >
-              Tutors
+              Our Team
+            </Link>
+            <Link
+              href="/packages"
+              className="text-spicy-dark hover:text-spicy-red font-medium"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Packages
             </Link>
             <Link
               href="/contact"

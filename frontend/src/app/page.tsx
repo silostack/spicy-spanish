@@ -52,7 +52,9 @@ export default function Home() {
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  className="h-10 w-10 text-spicy-red"
+                  width="40"
+                  height="40"
+                  className="text-spicy-red"
                 >
                   <path
                     strokeLinecap="round"
@@ -75,7 +77,9 @@ export default function Home() {
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  className="h-10 w-10 text-spicy-red"
+                  width="40"
+                  height="40"
+                  className="text-spicy-red"
                 >
                   <path
                     strokeLinecap="round"
@@ -98,7 +102,9 @@ export default function Home() {
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  className="h-10 w-10 text-spicy-red"
+                  width="40"
+                  height="40"
+                  className="text-spicy-red"
                 >
                   <path
                     strokeLinecap="round"
