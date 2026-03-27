@@ -47,7 +47,7 @@ async function bootstrap() {
   app.setGlobalPrefix("api");
 
   const port = configService.get("PORT") || 3001;
-  await app.listen(port);
+  await app.listen(port, "127.0.0.1");
   logger.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();
