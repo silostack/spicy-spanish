@@ -518,6 +518,44 @@ export class EmailService {
     });
   }
 
+  async sendEbookDownloadEmail(email: string): Promise<void> {
+    const frontendUrl =
+      this.configService.get("FRONTEND_URL") || "http://localhost:8008";
+    const downloadLink = `${frontendUrl}/downloads/spicy-spanish-ebook.pdf`;
+
+    const template = `
+      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #482C2D;">Your Free Spanish Guide is Ready!</h1>
+        <p>Thanks for your interest in learning Spanish with Spicy Spanish.</p>
+        <p>Click the button below to download your free copy of <strong>The Digital Nomad Spanish Survival Guide</strong>:</p>
+        <p style="text-align: center; margin: 32px 0;">
+          <a href="{{downloadLink}}" style="display:inline-block;padding:14px 32px;background-color:#FF5C5C;color:white;text-decoration:none;border-radius:9999px;font-weight:600;">Download Your Free Guide</a>
+        </p>
+        <p>Inside you'll find:</p>
+        <ul>
+          <li>Essential business Spanish phrases</li>
+          <li>The CRASH Method for learning 5x faster</li>
+          <li>A 90-day fluency roadmap</li>
+          <li>Common mistakes that kill your credibility</li>
+        </ul>
+        <p>Ready to take your Spanish to the next level? <a href="{{frontendUrl}}/packages" style="color: #FF5C5C;">Check out our class packages</a> for personalized lessons with native tutors.</p>
+        <p>¡Buena suerte!</p>
+        <p><em>— The Spicy Spanish Team</em></p>
+      </div>
+    `;
+
+    const compiledTemplate = handlebars.compile(template);
+    const html = compiledTemplate({ downloadLink, frontendUrl });
+
+    await this.transporter.sendMail({
+      from: this.configService.get("EMAIL_FROM"),
+      to: email,
+      subject:
+        "Your Free Spanish Survival Guide - Spicy Spanish",
+      html,
+    });
+  }
+
   async sendDayBeforeReminder(lesson: Lesson): Promise<void> {
     const students = lesson.students.getItems();
     const student = students[0];

@@ -37,6 +37,9 @@ export default function Header() {
           <Link href="/contact" className="text-spicy-dark hover:text-spicy-red font-medium">
             Contact
           </Link>
+          <Link href="/free-ebook" className="text-spicy-red hover:text-spicy-dark font-semibold">
+            Free Ebook
+          </Link>
         </nav>
 
         <div className="hidden md:flex space-x-4">
@@ -118,6 +121,13 @@ export default function Header() {
               onClick={() => setIsMenuOpen(false)}
             >
               Contact
+            </Link>
+            <Link
+              href="/free-ebook"
+              className="text-spicy-red hover:text-spicy-dark font-semibold"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Free Ebook
             </Link>
             <div className="pt-4 flex flex-col space-y-2">
               <Link

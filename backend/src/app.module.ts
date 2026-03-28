@@ -18,6 +18,7 @@ import { AdminModule } from "./admin/admin.module";
 import { SeederModule } from "./seeders/seeder.module";
 import { ContactModule } from "./contact/contact.module";
 import { HealthModule } from "./health/health.module";
+import { EbookModule } from "./ebook/ebook.module";
 import { RawBodyMiddleware } from "./common/middleware/raw-body.middleware";
 
 @Module({
@@ -59,6 +60,7 @@ import { RawBodyMiddleware } from "./common/middleware/raw-body.middleware";
     SeederModule,
     ContactModule,
     HealthModule,
+    EbookModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -67,6 +67,11 @@ export default function Footer() {
                   Class Packages
                 </Link>
               </li>
+              <li>
+                <Link href="/free-ebook" className="hover:text-spicy-orange transition-colors">
+                  Free Ebook
+                </Link>
+              </li>
             </ul>
           </div>
 
