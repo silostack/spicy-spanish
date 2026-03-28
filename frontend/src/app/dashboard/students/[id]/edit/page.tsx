@@ -26,6 +26,7 @@ interface UpdateStudentForm {
   phoneNumber: string;
   timezone: string;
   isActive: boolean;
+  password: string;
 }
 
 export default function StudentEditPage() {
@@ -47,6 +48,7 @@ export default function StudentEditPage() {
     phoneNumber: '',
     timezone: '',
     isActive: true,
+    password: '',
   });
 
   useEffect(() => {
@@ -287,6 +289,22 @@ export default function StudentEditPage() {
         {/* System Settings */}
         <div className="bg-white rounded-xl shadow-md p-6">
           <h2 className="text-xl font-semibold text-spicy-dark mb-4">System Settings</h2>
+
+          <div className="mb-6">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              Set New Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-spicy-red"
+              placeholder="Leave blank to keep current password"
+              value={formData.password}
+              onChange={handleChange}
+            />
+            <p className="mt-1 text-sm text-gray-500">Only fill this if you want to change the password.</p>
+          </div>
 
           <div className="flex items-center">
             <input
