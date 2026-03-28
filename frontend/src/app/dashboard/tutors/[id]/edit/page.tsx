@@ -94,6 +94,7 @@ export default function TutorEditPage() {
         address: tutorData.address || '',
         tutorExperience: tutorData.tutorExperience || '',
         isActive: tutorData.isActive,
+        password: '',
       });
     } catch (error: any) {
 

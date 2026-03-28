@@ -71,6 +71,7 @@ export default function StudentEditPage() {
         phoneNumber: studentData.phoneNumber || '',
         timezone: studentData.timezone || '',
         isActive: studentData.isActive,
+        password: '',
       });
     } catch (error: any) {
       setError(error.response?.data?.message || 'Failed to load student details');
