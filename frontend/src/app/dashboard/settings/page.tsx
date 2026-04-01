@@ -37,7 +37,15 @@ const ProfileSettings = () => {
     setMessage('');
 
     try {
-      const response = await api.patch(`/users/${user?.id}`, formData);
+      // Strip empty strings to avoid validation errors (e.g. dateOfBirth: '' fails @IsDateString)
+      const cleanedData: Record<string, any> = {};
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== '' && value !== null && value !== undefined) {
+          cleanedData[key] = value;
+        }
+      });
+
+      const response = await api.patch(`/users/${user?.id}`, cleanedData);
       setMessage('Profile updated successfully!');
       setIsEditing(false);
       // Optionally refresh user data in context

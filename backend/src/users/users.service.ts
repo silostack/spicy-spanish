@@ -12,6 +12,7 @@ import {
   TransactionStatus,
 } from "../payments/entities/transaction.entity";
 import { Lesson } from "../scheduling/entities/lesson.entity";
+import { Course } from "../courses/entities/course.entity";
 import * as bcrypt from "bcrypt";
 
 interface StudentListQuery {
@@ -95,7 +96,30 @@ export class UsersService {
   }
 
   async getTutors() {
-    return this.findAll(UserRole.TUTOR);
+    const tutors = await this.findAll(UserRole.TUTOR);
+
+    // Enrich each tutor with total student count from their courses
+    const enrichedTutors = await Promise.all(
+      tutors.map(async (tutor) => {
+        const courses = await this.em.find(
+          Course,
+          { tutor: tutor.id },
+          { populate: ["students"] },
+        );
+        const studentIds = new Set<string>();
+        for (const course of courses) {
+          for (const student of course.students.getItems()) {
+            studentIds.add(student.id);
+          }
+        }
+        return {
+          ...tutor,
+          totalStudents: studentIds.size,
+        };
+      }),
+    );
+
+    return enrichedTutors;
   }
 
   async getAdmins() {
@@ -205,29 +229,24 @@ export class UsersService {
     // Enrich students with additional details
     const enrichedStudents = await Promise.all(
       students.map(async (student) => {
-        const [appointmentsCount, transactions, lastAppointment] =
-          await Promise.all([
-            this.em.count(Lesson, { students: student.id }),
-            this.em.find(Transaction, {
-              student: student.id,
-              status: TransactionStatus.COMPLETED,
-            }),
-            this.em.findOne(
-              Lesson,
-              { students: student.id },
-              { orderBy: { startTime: "DESC" } },
-            ),
-          ]);
+        const [courses, lastAppointment] = await Promise.all([
+          this.em.find(Course, { students: student.id }),
+          this.em.findOne(
+            Lesson,
+            { students: student.id },
+            { orderBy: { startTime: "DESC" } },
+          ),
+        ]);
 
-        // Calculate available hours from transactions
-        const availableHours = transactions.reduce(
-          (total, t) => total + t.hours,
+        // Calculate available hours from course hoursBalance
+        const availableHours = courses.reduce(
+          (total, c) => total + Number(c.hoursBalance),
           0,
         );
 
         const enriched: StudentWithDetails = {
           ...student,
-          coursesEnrolled: appointmentsCount,
+          coursesEnrolled: courses.length,
           availableHours,
           lastActive: lastAppointment?.startTime,
         };

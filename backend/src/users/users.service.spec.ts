@@ -263,9 +263,21 @@ describe("UsersService", () => {
   });
 
   describe("getTutors", () => {
-    it("should return all users with TUTOR role", async () => {
+    it("should return all users with TUTOR role enriched with totalStudents", async () => {
       const tutors = [mockUser({ id: "tutor-1", role: UserRole.TUTOR })];
       userRepository.find.mockResolvedValue(tutors);
+      em.find.mockResolvedValue([
+        {
+          students: {
+            getItems: () => [{ id: "s1" }, { id: "s2" }],
+          },
+        },
+        {
+          students: {
+            getItems: () => [{ id: "s2" }, { id: "s3" }],
+          },
+        },
+      ] as any);
 
       const result = await service.getTutors();
 
@@ -273,7 +285,7 @@ describe("UsersService", () => {
         { role: UserRole.TUTOR },
         { orderBy: { createdAt: "DESC" } },
       );
-      expect(result).toEqual(tutors);
+      expect(result[0].totalStudents).toBe(3);
     });
   });
 
@@ -311,8 +323,7 @@ describe("UsersService", () => {
     it("should return paginated students with defaults", async () => {
       const students = [mockUser()];
       userRepository.findAndCount.mockResolvedValue([students, 1]);
-      em.count.mockResolvedValue(1);
-      em.find.mockResolvedValue([{ hours: 5 } as any]);
+      em.find.mockResolvedValue([{ hoursBalance: 5 } as any]);
       em.findOne.mockResolvedValue(null);
 
       const result = await service.getStudentsWithPagination();
@@ -398,7 +409,6 @@ describe("UsersService", () => {
         },
       );
       userRepository.findAndCount.mockResolvedValue([[student], 1]);
-      em.count.mockResolvedValue(0);
       em.findOne.mockResolvedValue(null);
 
       const result = await service.getStudentsWithPagination({
@@ -424,11 +434,13 @@ describe("UsersService", () => {
       expect(result.total).toBe(0);
     });
 
-    it("should calculate availableHours from transactions", async () => {
+    it("should calculate availableHours from course hoursBalance", async () => {
       const student = mockUser();
       userRepository.findAndCount.mockResolvedValue([[student], 1]);
-      em.count.mockResolvedValue(2);
-      em.find.mockResolvedValue([{ hours: 5 }, { hours: 3 }] as any);
+      em.find.mockResolvedValue([
+        { hoursBalance: 5 },
+        { hoursBalance: 3 },
+      ] as any);
       em.findOne.mockResolvedValue(null);
 
       const result = await service.getStudentsWithPagination();
@@ -441,7 +453,6 @@ describe("UsersService", () => {
       const student = mockUser();
       const appointmentDate = new Date("2026-02-01");
       userRepository.findAndCount.mockResolvedValue([[student], 1]);
-      em.count.mockResolvedValue(0);
       em.find.mockResolvedValue([]);
       em.findOne.mockResolvedValue({ startTime: appointmentDate } as any);
 

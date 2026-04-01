@@ -215,6 +215,18 @@ export default function StudentsPage() {
     }
   };
 
+  const deleteStudent = async (studentId: string, studentName: string) => {
+    if (!window.confirm(`Are you sure you want to delete student "${studentName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/users/${studentId}`);
+      fetchStudents();
+    } catch (error) {
+      alert('Failed to delete student');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -420,9 +432,6 @@ export default function StudentsPage() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Courses
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Hours
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -478,9 +487,6 @@ export default function StudentsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {student.coursesEnrolled} courses
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {student.availableHours} hours
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -495,12 +501,20 @@ export default function StudentsPage() {
                             View
                           </Link>
                           {user?.role === 'admin' && (
-                            <Link
-                              href={`/dashboard/students/${student.id}/edit`}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              Edit
-                            </Link>
+                            <>
+                              <Link
+                                href={`/dashboard/students/${student.id}/edit`}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                Edit
+                              </Link>
+                              <button
+                                onClick={() => deleteStudent(student.id, `${student.firstName} ${student.lastName}`)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -508,7 +522,7 @@ export default function StudentsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                       <div className="text-lg font-medium text-gray-900">No students found</div>
                       <div className="mt-1">
                         {searchTerm ? 'Try adjusting your search terms' : 'No students have been added yet'}

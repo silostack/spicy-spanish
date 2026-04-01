@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 
 interface Tutor {
@@ -26,6 +27,7 @@ interface Tutor {
 }
 
 export default function TutorsPage() {
+  const { user } = useAuth();
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +126,18 @@ export default function TutorsPage() {
     } catch (error) {
 
       alert('Failed to update user status');
+    }
+  };
+
+  const deleteTutor = async (tutorId: string, tutorName: string) => {
+    if (!window.confirm(`Are you sure you want to delete tutor "${tutorName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/users/${tutorId}`);
+      fetchTutors();
+    } catch (error) {
+      alert('Failed to delete tutor');
     }
   };
 
@@ -367,6 +381,14 @@ export default function TutorsPage() {
                             <Link href={`/dashboard/tutors/${tutor.id}/edit`} className="text-blue-600 hover:text-blue-900">
                               Edit
                             </Link>
+                            {user?.role === 'admin' && (
+                              <button
+                                onClick={() => deleteTutor(tutor.id, `${tutor.firstName} ${tutor.lastName}`)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

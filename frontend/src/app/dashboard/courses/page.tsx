@@ -122,6 +122,18 @@ export default function CoursesPage() {
     }
   };
 
+  const deleteCourse = async (courseId: string, courseTitle: string) => {
+    if (!window.confirm(`Are you sure you want to delete course "${courseTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/courses/${courseId}`);
+      fetchCourses();
+    } catch (error) {
+      alert('Failed to delete course');
+    }
+  };
+
   if (loading && courses.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -355,6 +367,12 @@ export default function CoursesPage() {
                             }
                           >
                             {course.isActive ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => deleteCourse(course.id, course.title)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
                           </button>
                         </div>
                       </td>
