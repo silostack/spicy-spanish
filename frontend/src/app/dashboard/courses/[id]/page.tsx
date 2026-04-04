@@ -554,12 +554,6 @@ export default function CourseViewPage() {
                       >
                         Reschedule
                       </button>
-                      <button
-                        onClick={() => openCompleteLessonModal(lesson)}
-                        className="px-3 py-1.5 bg-spicy-red text-white text-sm rounded-md hover:bg-spicy-orange"
-                      >
-                        Log Attendance
-                      </button>
                     </div>
                   )}
                 </div>
@@ -594,9 +588,19 @@ export default function CourseViewPage() {
                           {lesson.students.map((student) => `${student.firstName} ${student.lastName}`).join(', ')}
                         </div>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(lesson.status)}`}>
-                        {lesson.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(lesson.status)}`}>
+                          {lesson.status}
+                        </span>
+                        {(user?.role === 'tutor' || user?.role === 'admin') && lesson.status === 'scheduled' && new Date(lesson.startTime) <= new Date() && (
+                          <button
+                            onClick={() => openCompleteLessonModal(lesson)}
+                            className="px-3 py-1.5 bg-spicy-red text-white text-sm rounded-md hover:bg-spicy-orange"
+                          >
+                            Log Attendance
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-2 text-xs text-gray-600">
