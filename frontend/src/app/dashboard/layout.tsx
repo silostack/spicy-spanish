@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '../contexts/AuthContext';
+import ImpersonationBanner from '../components/ImpersonationBanner';
 
 const DashboardSkeleton = () => {
   return (
@@ -116,6 +117,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <ImpersonationBanner />
       {/* Sidebar for desktop */}
       <div
         className={`fixed inset-y-0 left-0 z-40 w-64 bg-spicy-dark text-white transition-transform duration-300 transform ${
