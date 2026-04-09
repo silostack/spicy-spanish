@@ -30,10 +30,13 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isImpersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: any) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => Promise<void>;
+  impersonate: (userId: string) => Promise<void>;
+  stopImpersonating: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,11 +45,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isImpersonating, setIsImpersonating] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     // Check for token in localStorage on initial load
     const storedToken = localStorage.getItem('token');
+    const adminToken = localStorage.getItem('adminToken');
+    if (adminToken) {
+      setIsImpersonating(true);
+    }
 
     if (storedToken) {
       try {
@@ -212,6 +220,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const impersonate = async (userId: string) => {
+    try {
+      setIsLoading(true);
+      const currentToken = localStorage.getItem('token');
+      const response = await api.post(`/auth/impersonate/${userId}`);
+      const { access_token } = response.data;
+
+      // Save admin token for later restoration
+      localStorage.setItem('adminToken', currentToken!);
+      localStorage.setItem('token', access_token);
+      setToken(access_token);
+      setIsImpersonating(true);
+
+      await fetchUserData(access_token);
+      router.push('/dashboard');
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopImpersonating = async () => {
+    try {
+      setIsLoading(true);
+      const adminToken = localStorage.getItem('adminToken');
+      if (!adminToken) return;
+
+      localStorage.setItem('token', adminToken);
+      localStorage.removeItem('adminToken');
+      setToken(adminToken);
+      setIsImpersonating(false);
+
+      await fetchUserData(adminToken);
+      router.push('/dashboard');
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -219,10 +269,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isLoading,
         isAuthenticated: !!user,
+        isImpersonating,
         login,
         register,
         logout,
         updateUser,
+        impersonate,
+        stopImpersonating,
       }}
     >
       {children}
