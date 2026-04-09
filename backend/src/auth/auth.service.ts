@@ -60,6 +60,31 @@ export class AuthService {
     };
   }
 
+  async impersonate(userId: string, adminId: string) {
+    const user = await this.em.findOne(User, { id: userId });
+    if (!user || !user.isActive) {
+      throw new NotFoundException("User not found or inactive");
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      impersonatedBy: adminId,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
+    };
+  }
+
   async registerStudent(registerDto: RegisterStudentDto) {
     const existingUser = await this.em.findOne(User, {
       email: registerDto.email,

@@ -511,4 +511,51 @@ describe("AuthService", () => {
       expect(em.persistAndFlush).not.toHaveBeenCalled();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // impersonate
+  // ---------------------------------------------------------------------------
+  describe("impersonate", () => {
+    it("should return access_token and user for a valid active user", async () => {
+      const targetUser = mockUser();
+      targetUser.isActive = true;
+      em.findOne.mockResolvedValue(targetUser);
+
+      const result = await service.impersonate("user-id-123", "admin-id-456");
+
+      expect(em.findOne).toHaveBeenCalledWith(User, { id: "user-id-123" });
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        sub: "user-id-123",
+        email: "john@example.com",
+        role: UserRole.STUDENT,
+        impersonatedBy: "admin-id-456",
+      });
+      expect(result.access_token).toBe("mock-jwt-token");
+      expect(result.user).toEqual({
+        id: "user-id-123",
+        email: "john@example.com",
+        firstName: "John",
+        lastName: "Doe",
+        role: UserRole.STUDENT,
+      });
+    });
+
+    it("should throw NotFoundException when user does not exist", async () => {
+      em.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.impersonate("nonexistent-id", "admin-id-456"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw NotFoundException when user is inactive", async () => {
+      const inactiveUser = mockUser();
+      inactiveUser.isActive = false;
+      em.findOne.mockResolvedValue(inactiveUser);
+
+      await expect(
+        service.impersonate("user-id-123", "admin-id-456"),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });
