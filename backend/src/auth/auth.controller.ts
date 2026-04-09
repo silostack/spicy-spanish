@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Req, Get } from "@nestjs/common";
+import { Controller, Post, Body, UseGuards, Req, Get, Param } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { UsersService } from "../users/users.service";
 import { LoginDto } from "./dto/login.dto";
@@ -76,6 +76,13 @@ export class AuthController {
   @Post("register/tutor/direct")
   async registerTutorDirect(@Body() dto: RegisterTutorDirectDto) {
     return this.authService.registerTutorDirect(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post("impersonate/:userId")
+  async impersonate(@Param("userId") userId: string, @Req() req) {
+    return this.authService.impersonate(userId, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
