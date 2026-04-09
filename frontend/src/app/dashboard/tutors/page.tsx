@@ -27,7 +27,7 @@ interface Tutor {
 }
 
 export default function TutorsPage() {
-  const { user } = useAuth();
+  const { user, impersonate } = useAuth();
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -382,12 +382,20 @@ export default function TutorsPage() {
                               Edit
                             </Link>
                             {user?.role === 'admin' && (
-                              <button
-                                onClick={() => deleteTutor(tutor.id, `${tutor.firstName} ${tutor.lastName}`)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                Delete
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => impersonate(tutor.id)}
+                                  className="text-amber-600 hover:text-amber-800"
+                                >
+                                  Login As
+                                </button>
+                                <button
+                                  onClick={() => deleteTutor(tutor.id, `${tutor.firstName} ${tutor.lastName}`)}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              </>
                             )}
                           </>
                         )}
