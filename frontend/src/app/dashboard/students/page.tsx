@@ -29,7 +29,7 @@ interface ApiResponse {
 
 // Main Component
 export default function StudentsPage() {
-  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated, impersonate } = useAuth();
   
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -502,6 +502,12 @@ export default function StudentsPage() {
                           </Link>
                           {user?.role === 'admin' && (
                             <>
+                              <button
+                                onClick={() => impersonate(student.id)}
+                                className="text-amber-600 hover:text-amber-800"
+                              >
+                                Login As
+                              </button>
                               <Link
                                 href={`/dashboard/students/${student.id}/edit`}
                                 className="text-blue-600 hover:text-blue-900"
