@@ -74,7 +74,11 @@ export class SchedulingService {
     return lesson;
   }
 
-  async findLessonsByCourse(courseId: string, actor: User) {
+  async findLessonsByCourse(
+    courseId: string,
+    actor: User,
+    category?: "upcoming" | "needs-attendance" | "recent",
+  ) {
     const course = await this.courseRepository.findOne(
       { id: courseId },
       { populate: ["tutor", "students", "schedules"] },
@@ -108,12 +112,37 @@ export class SchedulingService {
       }
     }
 
+    const now = new Date();
+    const populate = ["students", "tutor", "course"] as const;
+
+    if (category === "upcoming") {
+      return this.lessonRepository.find(
+        { course: courseId, status: LessonStatus.SCHEDULED, startTime: { $gt: now } },
+        { populate, orderBy: { startTime: "ASC" } },
+      );
+    }
+
+    if (category === "needs-attendance") {
+      return this.lessonRepository.find(
+        { course: courseId, status: LessonStatus.SCHEDULED, startTime: { $lte: now } },
+        { populate, orderBy: { startTime: "DESC" } },
+      );
+    }
+
+    if (category === "recent") {
+      return this.lessonRepository.find(
+        {
+          course: courseId,
+          status: { $ne: LessonStatus.SCHEDULED },
+          startTime: { $lte: now },
+        },
+        { populate, orderBy: { startTime: "DESC" }, limit: 10 },
+      );
+    }
+
     return this.lessonRepository.find(
       { course: courseId },
-      {
-        populate: ["students", "tutor", "course"],
-        orderBy: { startTime: "DESC" },
-      },
+      { populate, orderBy: { startTime: "DESC" } },
     );
   }
 

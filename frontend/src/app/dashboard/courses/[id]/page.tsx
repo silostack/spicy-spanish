@@ -68,7 +68,9 @@ export default function CourseViewPage() {
   const { user } = useAuth();
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [upcomingLessons, setUpcomingLessons] = useState<Lesson[]>([]);
+  const [needsAttendanceLessons, setNeedsAttendanceLessons] = useState<Lesson[]>([]);
+  const [recentLessons, setRecentLessons] = useState<Lesson[]>([]);
   const [lessonAttendanceMap, setLessonAttendanceMap] = useState<Record<string, AttendanceRecord[]>>({});
   const [lessonReportMap, setLessonReportMap] = useState<Record<string, ClassReport | null>>({});
 
@@ -132,35 +134,44 @@ export default function CourseViewPage() {
     try {
       setLessonsLoading(true);
       setLessonsError(null);
-      const response = await api.get(`/scheduling/courses/${courseId}/lessons`);
-      const lessonsData: Lesson[] = response.data || [];
-      setLessons(lessonsData);
+      const base = `/scheduling/courses/${courseId}/lessons`;
 
-      const recentLessons = [...lessonsData]
-        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-        .slice(0, 10);
+      const [upcomingRes, needsAttendanceRes, recentRes] = await Promise.all([
+        api.get(`${base}?category=upcoming`),
+        api.get(`${base}?category=needs-attendance`),
+        api.get(`${base}?category=recent`),
+      ]);
 
-      const attendanceEntries = await Promise.all(
-        recentLessons.map(async (lesson) => {
-          try {
-            const attendanceResponse = await api.get(`/scheduling/attendance/lesson/${lesson.id}`);
-            return [lesson.id, attendanceResponse.data || []] as const;
-          } catch {
-            return [lesson.id, []] as const;
-          }
-        }),
-      );
+      const upcoming: Lesson[] = upcomingRes.data || [];
+      const needsAttendance: Lesson[] = needsAttendanceRes.data || [];
+      const recent: Lesson[] = recentRes.data || [];
 
-      const reportEntries = await Promise.all(
-        recentLessons.map(async (lesson) => {
-          try {
-            const reportResponse = await api.get(`/scheduling/class-reports/lesson/${lesson.id}`);
-            return [lesson.id, reportResponse.data || null] as const;
-          } catch {
-            return [lesson.id, null] as const;
-          }
-        }),
-      );
+      setUpcomingLessons(upcoming);
+      setNeedsAttendanceLessons(needsAttendance);
+      setRecentLessons(recent);
+
+      const [attendanceEntries, reportEntries] = await Promise.all([
+        Promise.all(
+          recent.map(async (lesson) => {
+            try {
+              const res = await api.get(`/scheduling/attendance/lesson/${lesson.id}`);
+              return [lesson.id, res.data || []] as const;
+            } catch {
+              return [lesson.id, []] as const;
+            }
+          }),
+        ),
+        Promise.all(
+          recent.map(async (lesson) => {
+            try {
+              const res = await api.get(`/scheduling/class-reports/lesson/${lesson.id}`);
+              return [lesson.id, res.data || null] as const;
+            } catch {
+              return [lesson.id, null] as const;
+            }
+          }),
+        ),
+      ]);
 
       setLessonAttendanceMap(Object.fromEntries(attendanceEntries));
       setLessonReportMap(Object.fromEntries(reportEntries));
@@ -373,20 +384,7 @@ export default function CourseViewPage() {
     );
   }
 
-  const now = new Date();
 
-  const upcomingLessons = lessons
-    .filter((lesson) => lesson.status === 'scheduled' && new Date(lesson.startTime) > now)
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-  const needsAttendanceLessons = lessons
-    .filter((lesson) => lesson.status === 'scheduled' && new Date(lesson.startTime) <= now)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-
-  const recentLessons = [...lessons]
-    .filter((lesson) => lesson.status !== 'scheduled' && new Date(lesson.startTime) <= now)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .slice(0, 10);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
