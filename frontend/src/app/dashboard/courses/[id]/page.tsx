@@ -373,11 +373,18 @@ export default function CourseViewPage() {
     );
   }
 
+  const now = new Date();
+
   const upcomingLessons = lessons
-    .filter((lesson) => lesson.status === 'scheduled' && new Date(lesson.startTime) > new Date())
+    .filter((lesson) => lesson.status === 'scheduled' && new Date(lesson.startTime) > now)
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
+  const needsAttendanceLessons = lessons
+    .filter((lesson) => lesson.status === 'scheduled' && new Date(lesson.startTime) <= now)
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
   const recentLessons = [...lessons]
+    .filter((lesson) => lesson.status !== 'scheduled' && new Date(lesson.startTime) <= now)
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
     .slice(0, 10);
 
@@ -562,6 +569,30 @@ export default function CourseViewPage() {
           )}
         </div>
 
+        {(user?.role === 'tutor' || user?.role === 'admin') && needsAttendanceLessons.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-spicy-red">
+            <h2 className="text-lg font-semibold text-spicy-dark mb-4">Needs Attendance</h2>
+            <div className="space-y-3">
+              {needsAttendanceLessons.map((lesson) => (
+                <div key={lesson.id} className="border border-gray-100 rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{formatDateTime(lesson.startTime)}</div>
+                    <div className="text-xs text-gray-500">
+                      {lesson.students.map((student) => `${student.firstName} ${student.lastName}`).join(', ')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => openCompleteLessonModal(lesson)}
+                    className="px-3 py-1.5 bg-spicy-red text-white text-sm rounded-md hover:bg-spicy-orange"
+                  >
+                    Log Attendance
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl shadow-md p-6">
           <h2 className="text-lg font-semibold text-spicy-dark mb-4">Recent Lessons</h2>
           {lessonsLoading ? (
@@ -588,19 +619,9 @@ export default function CourseViewPage() {
                           {lesson.students.map((student) => `${student.firstName} ${student.lastName}`).join(', ')}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(lesson.status)}`}>
-                          {lesson.status}
-                        </span>
-                        {(user?.role === 'tutor' || user?.role === 'admin') && lesson.status === 'scheduled' && new Date(lesson.startTime) <= new Date() && (
-                          <button
-                            onClick={() => openCompleteLessonModal(lesson)}
-                            className="px-3 py-1.5 bg-spicy-red text-white text-sm rounded-md hover:bg-spicy-orange"
-                          >
-                            Log Attendance
-                          </button>
-                        )}
-                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadgeClass(lesson.status)}`}>
+                        {lesson.status}
+                      </span>
                     </div>
 
                     <div className="mt-2 text-xs text-gray-600">
