@@ -75,9 +75,7 @@ describe("LessonGeneratorService", () => {
       ],
     }).compile();
 
-    service = module.get<LessonGeneratorService>(
-      LessonGeneratorService,
-    );
+    service = module.get<LessonGeneratorService>(LessonGeneratorService);
   });
 
   it("should be defined", () => {

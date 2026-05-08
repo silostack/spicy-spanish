@@ -3,7 +3,9 @@ import { Migration } from "@mikro-orm/migrations";
 export class Migration20260306001000 extends Migration {
   async up(): Promise<void> {
     this.addSql('alter table "appointment" rename to "lesson";');
-    this.addSql('alter table "appointment_students" rename to "lesson_students";');
+    this.addSql(
+      'alter table "appointment_students" rename to "lesson_students";',
+    );
 
     this.addSql(
       'alter table "lesson" rename constraint "appointment_pkey" to "lesson_pkey";',
@@ -43,13 +45,13 @@ export class Migration20260306001000 extends Migration {
     );
 
     this.addSql(
-      "update \"attendance\" set \"status\" = 'absent' where \"status\" = 'on_time_cancellation';",
+      'update "attendance" set "status" = \'absent\' where "status" = \'on_time_cancellation\';',
     );
     this.addSql(
       'alter table "attendance" drop constraint if exists "attendance_status_check";',
     );
     this.addSql(
-      "alter table \"attendance\" add constraint \"attendance_status_check\" check (\"status\" in ('present', 'absent'));",
+      'alter table "attendance" add constraint "attendance_status_check" check ("status" in (\'present\', \'absent\'));',
     );
 
     this.addSql(
@@ -106,7 +108,9 @@ export class Migration20260306001000 extends Migration {
       'alter table "lesson" rename constraint "lesson_pkey" to "appointment_pkey";',
     );
 
-    this.addSql('alter table "lesson_students" rename to "appointment_students";');
+    this.addSql(
+      'alter table "lesson_students" rename to "appointment_students";',
+    );
     this.addSql('alter table "lesson" rename to "appointment";');
   }
 }

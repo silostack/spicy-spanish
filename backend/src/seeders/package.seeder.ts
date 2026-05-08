@@ -15,16 +15,14 @@ export const defaultPackages = [
   },
   {
     name: "Standard Package",
-    description:
-      "Our most popular option for consistent progress.",
+    description: "Our most popular option for consistent progress.",
     hours: 10,
     priceUsd: 264,
     isActive: true,
   },
   {
     name: "Premium Package",
-    description:
-      "For dedicated learners ready to accelerate their fluency.",
+    description: "For dedicated learners ready to accelerate their fluency.",
     hours: 20,
     priceUsd: 462,
     isActive: true,

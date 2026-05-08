@@ -90,14 +90,18 @@ export class SchedulingService {
     }
 
     if (actor.role === UserRole.TUTOR && course.tutor.id !== actor.id) {
-      throw new ForbiddenException("Tutors can only access their own course lessons");
+      throw new ForbiddenException(
+        "Tutors can only access their own course lessons",
+      );
     }
 
     if (
       actor.role === UserRole.STUDENT &&
       !course.students.getItems().some((student) => student.id === actor.id)
     ) {
-      throw new ForbiddenException("Students can only access lessons for enrolled courses");
+      throw new ForbiddenException(
+        "Students can only access lessons for enrolled courses",
+      );
     }
 
     // Auto-generate lessons if the course is active with schedules but has no future lessons
@@ -132,14 +136,22 @@ export class SchedulingService {
 
     if (category === "upcoming") {
       return this.lessonRepository.find(
-        { course: courseId, status: LessonStatus.SCHEDULED, startTime: { $gt: now } },
+        {
+          course: courseId,
+          status: LessonStatus.SCHEDULED,
+          startTime: { $gt: now },
+        },
         { populate, orderBy: { startTime: "ASC" } },
       );
     }
 
     if (category === "needs-attendance") {
       return this.lessonRepository.find(
-        { course: courseId, status: LessonStatus.SCHEDULED, startTime: { $lte: now } },
+        {
+          course: courseId,
+          status: LessonStatus.SCHEDULED,
+          startTime: { $lte: now },
+        },
         { populate, orderBy: { startTime: "DESC" } },
       );
     }
@@ -254,7 +266,9 @@ export class SchedulingService {
         (studentId) => !courseStudentIds.has(studentId),
       );
       if (hasOutsiderStudent) {
-        throw new BadRequestException("All students must belong to the selected course");
+        throw new BadRequestException(
+          "All students must belong to the selected course",
+        );
       }
     }
 
@@ -291,7 +305,10 @@ export class SchedulingService {
       description: lesson.notes,
       startTime: lesson.startTime,
       endTime: lesson.endTime,
-      attendeeEmails: [...students.map((student) => student.email), tutor.email],
+      attendeeEmails: [
+        ...students.map((student) => student.email),
+        tutor.email,
+      ],
     });
 
     if (calendarEventId) {
@@ -409,7 +426,9 @@ export class SchedulingService {
     const lesson = await this.findLessonById(id);
 
     if (lesson.status !== LessonStatus.SCHEDULED) {
-      throw new BadRequestException("Only scheduled lessons can be rescheduled");
+      throw new BadRequestException(
+        "Only scheduled lessons can be rescheduled",
+      );
     }
 
     const conflicts = await this.checkTimeConflicts(
@@ -459,20 +478,28 @@ export class SchedulingService {
         throw new NotFoundException(`Lesson with ID ${id} not found`);
       }
       if (lesson.status !== LessonStatus.SCHEDULED) {
-        throw new BadRequestException("Only scheduled lessons can be completed");
+        throw new BadRequestException(
+          "Only scheduled lessons can be completed",
+        );
       }
 
       if (actor.role === UserRole.TUTOR && lesson.tutor.id !== actor.id) {
-        throw new ForbiddenException("Tutors can only complete their own lessons");
+        throw new ForbiddenException(
+          "Tutors can only complete their own lessons",
+        );
       }
 
       const lessonStudents = lesson.students.getItems();
-      const lessonStudentIds = new Set(lessonStudents.map((student) => student.id));
+      const lessonStudentIds = new Set(
+        lessonStudents.map((student) => student.id),
+      );
       const payloadStudentIds = dto.attendances.map((item) => item.studentId);
       const uniquePayloadStudentIds = new Set(payloadStudentIds);
 
       if (uniquePayloadStudentIds.size !== payloadStudentIds.length) {
-        throw new BadRequestException("Attendance payload contains duplicate students");
+        throw new BadRequestException(
+          "Attendance payload contains duplicate students",
+        );
       }
 
       if (uniquePayloadStudentIds.size !== lessonStudentIds.size) {
@@ -491,12 +518,19 @@ export class SchedulingService {
 
       const attendances: Attendance[] = [];
       for (const item of dto.attendances) {
-        const student = lessonStudents.find((candidate) => candidate.id === item.studentId);
+        const student = lessonStudents.find(
+          (candidate) => candidate.id === item.studentId,
+        );
         if (!student) {
-          throw new BadRequestException(`Student ${item.studentId} not found on lesson`);
+          throw new BadRequestException(
+            `Student ${item.studentId} not found on lesson`,
+          );
         }
 
-        const existingAttendance = await em.findOne(Attendance, { lesson, student });
+        const existingAttendance = await em.findOne(Attendance, {
+          lesson,
+          student,
+        });
         if (existingAttendance) {
           throw new BadRequestException(
             `Attendance already exists for student ${item.studentId} in this lesson`,
@@ -518,7 +552,9 @@ export class SchedulingService {
       if (dto.report) {
         const existingReport = await em.findOne(ClassReport, { lesson });
         if (existingReport) {
-          throw new BadRequestException("Class report already exists for this lesson");
+          throw new BadRequestException(
+            "Class report already exists for this lesson",
+          );
         }
 
         report = new ClassReport(
@@ -538,7 +574,8 @@ export class SchedulingService {
       const durationHours =
         (lesson.endTime.getTime() - lesson.startTime.getTime()) /
         (1000 * 60 * 60);
-      lesson.course.hoursBalance = Number(lesson.course.hoursBalance) - durationHours;
+      lesson.course.hoursBalance =
+        Number(lesson.course.hoursBalance) - durationHours;
       lesson.course.needsRenewal = lesson.course.hoursBalance <= 0;
 
       if (lesson.googleCalendarEventId) {
@@ -634,15 +671,23 @@ export class SchedulingService {
   // Attendance methods
   async createAttendance(createAttendanceDto: CreateAttendanceDto) {
     const lessonId =
-      (createAttendanceDto as unknown as { lessonId?: string; appointmentId?: string }).lessonId ??
-      (createAttendanceDto as unknown as { lessonId?: string; appointmentId?: string }).appointmentId;
+      (
+        createAttendanceDto as unknown as {
+          lessonId?: string;
+          appointmentId?: string;
+        }
+      ).lessonId ??
+      (
+        createAttendanceDto as unknown as {
+          lessonId?: string;
+          appointmentId?: string;
+        }
+      ).appointmentId;
     const lesson = await this.lessonRepository.findOne({
       id: lessonId,
     });
     if (!lesson) {
-      throw new NotFoundException(
-        `Lesson with ID ${lessonId} not found`,
-      );
+      throw new NotFoundException(`Lesson with ID ${lessonId} not found`);
     }
 
     const student = await this.userRepository.findOne({
@@ -711,15 +756,23 @@ export class SchedulingService {
   // Class report methods
   async createClassReport(createClassReportDto: CreateClassReportDto) {
     const lessonId =
-      (createClassReportDto as unknown as { lessonId?: string; appointmentId?: string }).lessonId ??
-      (createClassReportDto as unknown as { lessonId?: string; appointmentId?: string }).appointmentId;
+      (
+        createClassReportDto as unknown as {
+          lessonId?: string;
+          appointmentId?: string;
+        }
+      ).lessonId ??
+      (
+        createClassReportDto as unknown as {
+          lessonId?: string;
+          appointmentId?: string;
+        }
+      ).appointmentId;
     const lesson = await this.lessonRepository.findOne({
       id: lessonId,
     });
     if (!lesson) {
-      throw new NotFoundException(
-        `Lesson with ID ${lessonId} not found`,
-      );
+      throw new NotFoundException(`Lesson with ID ${lessonId} not found`);
     }
 
     const tutor = await this.userRepository.findOne({
@@ -736,7 +789,9 @@ export class SchedulingService {
       lesson,
     });
     if (existingReport) {
-      throw new BadRequestException("Class report already exists for this lesson");
+      throw new BadRequestException(
+        "Class report already exists for this lesson",
+      );
     }
 
     const classReport = new ClassReport(

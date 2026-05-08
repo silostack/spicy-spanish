@@ -27,11 +27,7 @@ import { EmailModule } from "../email/email.module";
     EmailModule,
   ],
   controllers: [SchedulingController],
-  providers: [
-    SchedulingService,
-    GoogleCalendarService,
-    LessonGeneratorService,
-  ],
+  providers: [SchedulingService, GoogleCalendarService, LessonGeneratorService],
   exports: [SchedulingService],
 })
 export class SchedulingModule {}

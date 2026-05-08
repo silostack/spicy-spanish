@@ -42,7 +42,7 @@ export default function Header() {
           </Link>
         </nav>
 
-        <div className="hidden md:flex space-x-4">
+        <div className="hidden md:flex items-center space-x-4">
           <Link href="/login" className="text-spicy-dark hover:text-spicy-red font-medium">
             Log In
           </Link>

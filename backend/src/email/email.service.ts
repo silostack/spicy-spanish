@@ -6,10 +6,7 @@ import { InjectRepository } from "@mikro-orm/nestjs";
 import * as nodemailer from "nodemailer";
 import * as handlebars from "handlebars";
 import { User } from "../users/entities/user.entity";
-import {
-  Lesson,
-  LessonStatus,
-} from "../scheduling/entities/lesson.entity";
+import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
 import { Transaction } from "../payments/entities/transaction.entity";
 
 @Injectable()
@@ -405,9 +402,7 @@ export class EmailService {
           try {
             await this.sendDayBeforeReminder(lesson);
             await this.markDayBeforeReminderSent(em, lesson.id);
-            this.logger.log(
-              `Sent day-before reminder for lesson ${lesson.id}`,
-            );
+            this.logger.log(`Sent day-before reminder for lesson ${lesson.id}`);
           } catch (error) {
             this.logger.error(
               `Failed to send day-before reminder for lesson ${lesson.id}: ${error.message}`,
@@ -550,8 +545,7 @@ export class EmailService {
     await this.transporter.sendMail({
       from: this.configService.get("EMAIL_FROM"),
       to: email,
-      subject:
-        "Your Free Spanish Survival Guide - Spicy Spanish",
+      subject: "Your Free Spanish Survival Guide - Spicy Spanish",
       html,
     });
   }

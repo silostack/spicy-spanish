@@ -8,9 +8,7 @@ import { User } from "../users/entities/user.entity";
 import { Lesson } from "../scheduling/entities/lesson.entity";
 
 @Module({
-  imports: [
-    MikroOrmModule.forFeature([Package, Transaction, User, Lesson]),
-  ],
+  imports: [MikroOrmModule.forFeature([Package, Transaction, User, Lesson])],
   controllers: [PaymentsController],
   providers: [PaymentsService],
   exports: [PaymentsService],

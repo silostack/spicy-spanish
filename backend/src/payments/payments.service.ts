@@ -13,10 +13,7 @@ import {
   PaymentMethod,
 } from "./entities/transaction.entity";
 import { User, UserRole } from "../users/entities/user.entity";
-import {
-  Lesson,
-  LessonStatus,
-} from "../scheduling/entities/lesson.entity";
+import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
 import Stripe from "stripe";
 import {
   CreatePackageDto,

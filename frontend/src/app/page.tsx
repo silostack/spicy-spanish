@@ -32,7 +32,7 @@ export default function Home() {
                   src="/images/home_page_hero.png"
                   alt="Students learning Spanish"
                   fill
-                  className="object-cover"
+                  className="object-contain"
                 />
               </div>
             </div>

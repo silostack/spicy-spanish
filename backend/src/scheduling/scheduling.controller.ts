@@ -50,12 +50,24 @@ export class SchedulingController {
   @Get("courses/:courseId/lessons")
   async findLessonsByCourse(
     @Param("courseId") courseId: string,
-    @Query("category") category: "upcoming" | "needs-attendance" | "recent" | "date-range" | undefined,
+    @Query("category")
+    category:
+      | "upcoming"
+      | "needs-attendance"
+      | "recent"
+      | "date-range"
+      | undefined,
     @Query("startDate") startDate: string | undefined,
     @Query("endDate") endDate: string | undefined,
     @Req() req: Request & { user: User },
   ) {
-    return this.schedulingService.findLessonsByCourse(courseId, req.user, category, startDate, endDate);
+    return this.schedulingService.findLessonsByCourse(
+      courseId,
+      req.user,
+      category,
+      startDate,
+      endDate,
+    );
   }
 
   @Get("students/:id/lessons")
@@ -101,10 +113,7 @@ export class SchedulingController {
   }
 
   @Patch("lessons/:id/cancel")
-  async cancelLesson(
-    @Param("id") id: string,
-    @Body() dto: CancelLessonDto,
-  ) {
+  async cancelLesson(@Param("id") id: string, @Body() dto: CancelLessonDto) {
     return this.schedulingService.cancelLesson(id, dto);
   }
 

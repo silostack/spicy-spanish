@@ -186,7 +186,9 @@ describe("SchedulingService", () => {
         { provide: EmailService, useValue: emailService },
         {
           provide: LessonGeneratorService,
-          useValue: { generateLessonsForCourse: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            generateLessonsForCourse: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile();
