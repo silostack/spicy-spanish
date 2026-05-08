@@ -77,7 +77,9 @@ export class SchedulingService {
   async findLessonsByCourse(
     courseId: string,
     actor: User,
-    category?: "upcoming" | "needs-attendance" | "recent",
+    category?: "upcoming" | "needs-attendance" | "recent" | "date-range",
+    startDate?: string,
+    endDate?: string,
   ) {
     const course = await this.courseRepository.findOne(
       { id: courseId },
@@ -114,6 +116,19 @@ export class SchedulingService {
 
     const now = new Date();
     const populate = ["students", "tutor", "course"] as const;
+
+    if (category === "date-range" && startDate && endDate) {
+      return this.lessonRepository.find(
+        {
+          course: courseId,
+          startTime: {
+            $gte: new Date(`${startDate}T00:00:00`),
+            $lte: new Date(`${endDate}T23:59:59.999`),
+          },
+        },
+        { populate, orderBy: { startTime: "ASC" } },
+      );
+    }
 
     if (category === "upcoming") {
       return this.lessonRepository.find(

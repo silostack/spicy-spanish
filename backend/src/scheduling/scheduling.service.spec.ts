@@ -512,6 +512,54 @@ describe("SchedulingService", () => {
   });
 
   // -----------------------------------------------------------------------
+  // findLessonsByCourse with date-range category
+  // -----------------------------------------------------------------------
+
+  describe("findLessonsByCourse with date-range category", () => {
+    const mockAdmin = createMockUser({ role: UserRole.ADMIN, id: "admin-1" });
+    const mockLesson = createMockAppointment();
+
+    it("should return lessons within the given date range", async () => {
+      const startDate = "2026-04-01";
+      const endDate = "2026-04-15";
+
+      const mockCourse = {
+        id: "course-1",
+        isActive: true,
+        tutor: { id: "tut-1" },
+        students: { getItems: () => [] },
+        schedules: { length: 0 },
+      };
+      courseRepo.findOne.mockResolvedValue(mockCourse);
+      appointmentRepo.find.mockResolvedValue([mockLesson]);
+
+      const result = await service.findLessonsByCourse(
+        "course-1",
+        mockAdmin,
+        "date-range",
+        startDate,
+        endDate,
+      );
+
+      expect(appointmentRepo.find).toHaveBeenCalledWith(
+        {
+          course: "course-1",
+          startTime: {
+            $gte: new Date(`${startDate}T00:00:00`),
+            $lte: new Date(`${endDate}T23:59:59.999`),
+          },
+        },
+        {
+          populate: ["students", "tutor", "course"],
+          orderBy: { startTime: "ASC" },
+        },
+      );
+
+      expect(result).toEqual([mockLesson]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Availability CRUD
   // -----------------------------------------------------------------------
 

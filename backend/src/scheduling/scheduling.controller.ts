@@ -50,10 +50,12 @@ export class SchedulingController {
   @Get("courses/:courseId/lessons")
   async findLessonsByCourse(
     @Param("courseId") courseId: string,
-    @Query("category") category: "upcoming" | "needs-attendance" | "recent" | undefined,
+    @Query("category") category: "upcoming" | "needs-attendance" | "recent" | "date-range" | undefined,
+    @Query("startDate") startDate: string | undefined,
+    @Query("endDate") endDate: string | undefined,
     @Req() req: Request & { user: User },
   ) {
-    return this.schedulingService.findLessonsByCourse(courseId, req.user, category);
+    return this.schedulingService.findLessonsByCourse(courseId, req.user, category, startDate, endDate);
   }
 
   @Get("students/:id/lessons")
