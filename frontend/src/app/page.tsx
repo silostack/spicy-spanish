@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import Script from 'next/script';
 import MainLayout from './components/MainLayout';
 
 export default function Home() {
@@ -184,6 +185,44 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Affiliate / Partner Section */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center mb-8">
+            <h2 className="text-3xl font-display font-bold mb-4">
+              Dreaming of Living in Latin America?
+            </h2>
+            <p className="text-lg text-gray-700">
+              Learning Spanish is just the start. Our partners at Premium Propiedades can help
+              you find the perfect place to call home — get in touch below.
+            </p>
+          </div>
+          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+            <iframe
+              src="https://secure.premiumpropiedades.com/widget/form/IVSsEqiZ6CIhNn0ywfzR"
+              style={{ width: '100%', height: '409px', border: 'none', borderRadius: '3px' }}
+              id="inline-IVSsEqiZ6CIhNn0ywfzR"
+              data-layout="{'id':'INLINE'}"
+              data-trigger-type="alwaysShow"
+              data-trigger-value=""
+              data-activation-type="alwaysActivated"
+              data-activation-value=""
+              data-deactivation-type="neverDeactivate"
+              data-deactivation-value=""
+              data-form-name="SpacySpanish"
+              data-height="409"
+              data-layout-iframe-id="inline-IVSsEqiZ6CIhNn0ywfzR"
+              data-form-id="IVSsEqiZ6CIhNn0ywfzR"
+              title="SpacySpanish"
+            />
+          </div>
+        </div>
+        <Script
+          src="https://secure.premiumpropiedades.com/js/form_embed.js"
+          strategy="afterInteractive"
+        />
       </section>
     </MainLayout>
   );
