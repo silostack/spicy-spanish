@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../utils/api';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/tabs';
-import { Course, Lesson } from './types';
-import ScheduleTab from './ScheduleTab';
-import AttendanceTab from './AttendanceTab';
+import { Course } from './types';
+import LessonsTab from './LessonsTab';
 import DetailsTab from './DetailsTab';
 
 export default function CourseViewPage() {
@@ -19,33 +18,23 @@ export default function CourseViewPage() {
   const { user } = useAuth();
 
   const [course, setCourse] = useState<Course | null>(null);
-  const [upcomingLessons, setUpcomingLessons] = useState<Lesson[]>([]);
-  const [needsAttendanceLessons, setNeedsAttendanceLessons] = useState<Lesson[]>([]);
-
   const [loading, setLoading] = useState(true);
-  const [lessonsLoading, setLessonsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lessonsError, setLessonsError] = useState<string | null>(null);
 
-  const activeTab = searchParams.get('tab') || 'schedule';
+  const activeTab = searchParams.get('tab') || 'lessons';
 
   const setActiveTab = (tab: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (tab === 'schedule') {
-      params.delete('tab');
+    const next = new URLSearchParams(searchParams.toString());
+    if (tab === 'lessons') {
+      next.delete('tab');
     } else {
-      params.set('tab', tab);
+      next.set('tab', tab);
     }
-    const qs = params.toString();
+    const qs = next.toString();
     router.replace(`/dashboard/courses/${courseId}${qs ? `?${qs}` : ''}`, { scroll: false });
   };
 
-  useEffect(() => {
-    fetchCourse();
-    fetchScheduleLessons();
-  }, [courseId]);
-
-  const fetchCourse = async () => {
+  const fetchCourse = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -56,32 +45,11 @@ export default function CourseViewPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
 
-  const fetchScheduleLessons = async () => {
-    try {
-      setLessonsLoading(true);
-      setLessonsError(null);
-      const base = `/scheduling/courses/${courseId}/lessons`;
-
-      const [upcomingRes, needsAttendanceRes] = await Promise.all([
-        api.get(`${base}?category=upcoming`),
-        api.get(`${base}?category=needs-attendance`),
-      ]);
-
-      setUpcomingLessons(upcomingRes.data || []);
-      setNeedsAttendanceLessons(needsAttendanceRes.data || []);
-    } catch {
-      setLessonsError('Failed to load lessons');
-    } finally {
-      setLessonsLoading(false);
-    }
-  };
-
-  const handleLessonChanged = () => {
-    fetchScheduleLessons();
+  useEffect(() => {
     fetchCourse();
-  };
+  }, [fetchCourse]);
 
   if (loading) {
     return (
@@ -157,24 +125,16 @@ export default function CourseViewPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="lessons">Lessons</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="schedule">
-          <ScheduleTab
-            upcomingLessons={upcomingLessons}
-            needsAttendanceLessons={needsAttendanceLessons}
-            lessonsLoading={lessonsLoading}
-            lessonsError={lessonsError}
+        <TabsContent value="lessons">
+          <LessonsTab
+            courseId={courseId}
             userRole={user?.role || ''}
-            onLessonChanged={handleLessonChanged}
+            onCourseDataChanged={fetchCourse}
           />
-        </TabsContent>
-
-        <TabsContent value="attendance">
-          <AttendanceTab courseId={courseId} course={course} />
         </TabsContent>
 
         <TabsContent value="details">
