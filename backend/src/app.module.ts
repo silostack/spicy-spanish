@@ -1,9 +1,4 @@
-import {
-  Module,
-  NestModule,
-  MiddlewareConsumer,
-  RequestMethod,
-} from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { MikroOrmModule } from "@mikro-orm/nestjs";
 import { ScheduleModule } from "@nestjs/schedule";
@@ -19,7 +14,6 @@ import { SeederModule } from "./seeders/seeder.module";
 import { ContactModule } from "./contact/contact.module";
 import { HealthModule } from "./health/health.module";
 import { EbookModule } from "./ebook/ebook.module";
-import { RawBodyMiddleware } from "./common/middleware/raw-body.middleware";
 
 @Module({
   imports: [
@@ -63,12 +57,4 @@ import { RawBodyMiddleware } from "./common/middleware/raw-body.middleware";
     EbookModule,
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    // Apply raw body middleware for Stripe webhooks
-    consumer.apply(RawBodyMiddleware).forRoutes({
-      path: "api/payments/stripe/webhook",
-      method: RequestMethod.POST,
-    });
-  }
-}
+export class AppModule {}
