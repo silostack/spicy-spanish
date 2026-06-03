@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import api from '../../../utils/api';
 import { Course, DAY_NAMES } from './types';
+import { sortSchedules } from '../scheduleUtils';
 
 interface Props {
   course: Course;
@@ -42,7 +43,7 @@ export default function DetailsTab({ course, courseId, userRole, onCourseUpdated
   };
 
   const scheduleDisplay = course.schedules && course.schedules.length > 0
-    ? course.schedules.map((s) => `${DAY_NAMES[s.dayOfWeek]} ${s.startTime}–${s.endTime}`).join(', ')
+    ? sortSchedules(course.schedules).map((s) => `${DAY_NAMES[s.dayOfWeek]} ${s.startTime}–${s.endTime}`).join(', ')
     : 'No schedule set';
 
   return (

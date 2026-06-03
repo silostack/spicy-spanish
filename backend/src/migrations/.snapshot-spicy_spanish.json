@@ -765,6 +765,16 @@
           "length": 0,
           "mappedType": "datetime"
         },
+        "original_start_time": {
+          "name": "original_start_time",
+          "type": "timestamptz(0)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 0,
+          "mappedType": "datetime"
+        },
         "status": {
           "name": "status",
           "type": "text",

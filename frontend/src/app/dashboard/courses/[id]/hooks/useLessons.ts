@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { format } from 'date-fns';
 import api from '../../../../utils/api';
 import {
   AttendanceRecord,
@@ -18,7 +17,10 @@ interface UseLessonsResult {
   refetch: () => Promise<void>;
 }
 
-const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+// Send precise ISO instants for the visible grid's start/end so the backend
+// query window matches exactly what is rendered (no timezone-boundary drift
+// that could drop lessons at the edges of the range).
+const fmt = (d: Date) => d.toISOString();
 
 export function useLessons(
   courseId: string,
@@ -43,7 +45,9 @@ export function useLessons(
     setError(null);
     try {
       const res = await api.get(
-        `/scheduling/courses/${courseId}/lessons?category=date-range&startDate=${startKey}&endDate=${endKey}`,
+        `/scheduling/courses/${courseId}/lessons?category=date-range&startDate=${encodeURIComponent(
+          startKey,
+        )}&endDate=${encodeURIComponent(endKey)}`,
       );
       const fetched: Lesson[] = res.data || [];
       setLessons(fetched);

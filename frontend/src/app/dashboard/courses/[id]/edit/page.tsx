@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../../../utils/api';
+import { sortSchedules } from '../../scheduleUtils';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -259,7 +260,7 @@ export default function CourseEditPage() {
           {/* Existing slots */}
           {schedules.length > 0 ? (
             <ul className="space-y-2 mb-4">
-              {schedules.map((slot) => (
+              {sortSchedules(schedules).map((slot) => (
                 <li
                   key={slot.id}
                   className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-md"

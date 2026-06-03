@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { sortSchedules } from './scheduleUtils';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -36,7 +37,7 @@ interface Course {
 
 function formatScheduleSlots(schedules: CourseSchedule[]): string {
   if (!schedules || schedules.length === 0) return 'No schedule';
-  return schedules
+  return sortSchedules(schedules)
     .map((s) => `${DAY_NAMES[s.dayOfWeek]} ${s.startTime}-${s.endTime}`)
     .join(', ');
 }

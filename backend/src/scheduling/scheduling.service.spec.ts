@@ -522,8 +522,9 @@ describe("SchedulingService", () => {
     const mockLesson = createMockAppointment();
 
     it("should return lessons within the given date range", async () => {
-      const startDate = "2026-04-01";
-      const endDate = "2026-04-15";
+      // Frontend sends precise ISO instants for the visible grid boundaries.
+      const startDate = "2026-04-01T05:00:00.000Z";
+      const endDate = "2026-04-15T04:59:59.999Z";
 
       const mockCourse = {
         id: "course-1",
@@ -547,8 +548,8 @@ describe("SchedulingService", () => {
         {
           course: "course-1",
           startTime: {
-            $gte: new Date(`${startDate}T00:00:00`),
-            $lte: new Date(`${endDate}T23:59:59.999`),
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
           },
         },
         {
@@ -558,6 +559,54 @@ describe("SchedulingService", () => {
       );
 
       expect(result).toEqual([mockLesson]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // rescheduleLesson — originalStartTime capture
+  // -----------------------------------------------------------------------
+
+  describe("rescheduleLesson", () => {
+    it("captures the original start instant on the first reschedule", async () => {
+      const originalStart = new Date("2026-03-01T10:00:00Z");
+      const lesson = createMockAppointment({
+        startTime: originalStart,
+        endTime: new Date("2026-03-01T11:00:00Z"),
+        originalStartTime: undefined,
+      });
+      appointmentRepo.findOne.mockResolvedValue(lesson);
+      appointmentRepo.count.mockResolvedValue(0); // no conflicts
+      em.flush.mockResolvedValue(undefined);
+
+      const dto = {
+        startTime: new Date("2026-03-02T14:00:00Z"),
+        endTime: new Date("2026-03-02T15:00:00Z"),
+      };
+      await service.rescheduleLesson("appt-1", dto);
+
+      expect(lesson.originalStartTime).toEqual(originalStart);
+      expect(lesson.startTime).toEqual(dto.startTime);
+    });
+
+    it("does not overwrite originalStartTime on a later reschedule", async () => {
+      const trueOriginal = new Date("2026-03-01T10:00:00Z");
+      const lesson = createMockAppointment({
+        startTime: new Date("2026-03-02T14:00:00Z"), // already moved once
+        endTime: new Date("2026-03-02T15:00:00Z"),
+        originalStartTime: trueOriginal,
+      });
+      appointmentRepo.findOne.mockResolvedValue(lesson);
+      appointmentRepo.count.mockResolvedValue(0);
+      em.flush.mockResolvedValue(undefined);
+
+      const dto = {
+        startTime: new Date("2026-03-03T16:00:00Z"),
+        endTime: new Date("2026-03-03T17:00:00Z"),
+      };
+      await service.rescheduleLesson("appt-1", dto);
+
+      expect(lesson.originalStartTime).toEqual(trueOriginal);
+      expect(lesson.startTime).toEqual(dto.startTime);
     });
   });
 

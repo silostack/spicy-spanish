@@ -3,7 +3,7 @@ import { EntityManager, Collection } from "@mikro-orm/core";
 import { getRepositoryToken } from "@mikro-orm/nestjs";
 import { LessonGeneratorService } from "./lesson-generator.service";
 import { Course } from "../courses/entities/course.entity";
-import { Lesson } from "./entities/lesson.entity";
+import { Lesson, LessonStatus } from "./entities/lesson.entity";
 import { UserRole } from "../users/entities/user.entity";
 
 type MockRepo = Record<string, jest.Mock>;
@@ -111,6 +111,29 @@ describe("LessonGeneratorService", () => {
       expect(em.persistAndFlush).not.toHaveBeenCalled();
     });
 
+    it("should anchor lesson times to the school timezone regardless of server TZ", async () => {
+      // SCHEDULE_TIMEZONE defaults to America/Bogota (UTC-5, no DST), so a
+      // 10:00–11:00 wall-clock slot must always become 15:00Z–16:00Z, and land
+      // on its scheduled day (Wednesday), no matter what TZ the machine uses.
+      courseRepo.find.mockResolvedValue([mockCourse]);
+      lessonRepo.count.mockResolvedValue(0);
+      em.persistAndFlush.mockResolvedValue(undefined);
+
+      await service.generateAppointments();
+
+      const created = em.persistAndFlush.mock.calls[0][0] as Array<{
+        startTime: Date;
+        endTime: Date;
+      }>;
+      expect(created.length).toBeGreaterThan(0);
+      for (const lesson of created) {
+        expect(lesson.startTime.getUTCHours()).toBe(15);
+        expect(lesson.startTime.getUTCMinutes()).toBe(0);
+        expect(lesson.endTime.getUTCHours()).toBe(16);
+        expect(lesson.startTime.getUTCDay()).toBe(3); // Wednesday
+      }
+    });
+
     it("should skip slots where an lesson already exists", async () => {
       courseRepo.find.mockResolvedValue([mockCourse]);
       lessonRepo.count.mockResolvedValue(1); // lesson already exists
@@ -118,6 +141,24 @@ describe("LessonGeneratorService", () => {
       await service.generateAppointments();
 
       expect(em.persistAndFlush).not.toHaveBeenCalled();
+    });
+
+    it("should treat a rescheduled-away occurrence as already covered", async () => {
+      // The dedupe must match either a lesson sitting at the slot instant or one
+      // moved away from it (originalStartTime), so a rescheduled lesson is not
+      // recreated at its old time.
+      courseRepo.find.mockResolvedValue([mockCourse]);
+      lessonRepo.count.mockResolvedValue(0);
+      em.persistAndFlush.mockResolvedValue(undefined);
+
+      await service.generateAppointments();
+
+      const countQuery = lessonRepo.count.mock.calls[0][0];
+      expect(countQuery.status).toEqual({ $ne: LessonStatus.CANCELLED });
+      expect(countQuery.$or).toEqual([
+        { startTime: expect.any(Date) },
+        { originalStartTime: expect.any(Date) },
+      ]);
     });
 
     it("should not deduct hours from course balance", async () => {

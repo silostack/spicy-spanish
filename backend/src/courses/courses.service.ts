@@ -3,6 +3,8 @@ import { EntityManager, EntityRepository } from "@mikro-orm/core";
 import { InjectRepository } from "@mikro-orm/nestjs";
 import { Course } from "./entities/course.entity";
 import { CourseSchedule } from "./entities/course-schedule.entity";
+import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
+import { LessonGeneratorService } from "../scheduling/lesson-generator.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateCourseDto,
@@ -20,15 +22,21 @@ export class CoursesService {
     private readonly courseRepository: EntityRepository<Course>,
     @InjectRepository(CourseSchedule)
     private readonly scheduleRepository: EntityRepository<CourseSchedule>,
+    @InjectRepository(Lesson)
+    private readonly lessonRepository: EntityRepository<Lesson>,
     @InjectRepository(User)
     private readonly userRepository: EntityRepository<User>,
     private readonly em: EntityManager,
+    private readonly lessonGenerator: LessonGeneratorService,
   ) {}
 
   async findAllCourses() {
     return this.courseRepository.findAll({
       populate: ["tutor", "students", "schedules"],
-      orderBy: { title: "ASC" },
+      orderBy: {
+        title: "ASC",
+        schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+      },
     });
   }
 
@@ -37,7 +45,10 @@ export class CoursesService {
       { isActive: true },
       {
         populate: ["tutor", "students", "schedules"],
-        orderBy: { title: "ASC" },
+        orderBy: {
+          title: "ASC",
+          schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+        },
       },
     );
   }
@@ -45,7 +56,10 @@ export class CoursesService {
   async findCourseById(id: string) {
     const course = await this.courseRepository.findOne(
       { id },
-      { populate: ["tutor", "students", "schedules"] },
+      {
+        populate: ["tutor", "students", "schedules"],
+        orderBy: { schedules: { dayOfWeek: "ASC", startTime: "ASC" } },
+      },
     );
 
     if (!course) {
@@ -60,7 +74,10 @@ export class CoursesService {
       { tutor: tutorId },
       {
         populate: ["tutor", "students", "schedules"],
-        orderBy: { title: "ASC" },
+        orderBy: {
+          title: "ASC",
+          schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+        },
       },
     );
   }
@@ -70,7 +87,10 @@ export class CoursesService {
       { students: studentId },
       {
         populate: ["tutor", "students", "schedules"],
-        orderBy: { title: "ASC" },
+        orderBy: {
+          title: "ASC",
+          schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+        },
       },
     );
   }
@@ -168,16 +188,42 @@ export class CoursesService {
       dto.endTime,
     );
     await this.em.persistAndFlush(schedule);
+    await this.resyncFutureLessons(courseId);
     return schedule;
   }
 
   async removeSchedule(scheduleId: string) {
-    const schedule = await this.scheduleRepository.findOne({ id: scheduleId });
+    const schedule = await this.scheduleRepository.findOne(
+      { id: scheduleId },
+      { populate: ["course"] },
+    );
     if (!schedule) {
       throw new NotFoundException(`Schedule with ID ${scheduleId} not found`);
     }
+    const courseId = schedule.course.id;
     await this.em.removeAndFlush(schedule);
+    await this.resyncFutureLessons(courseId);
     return { id: scheduleId, deleted: true };
+  }
+
+  /**
+   * After a schedule slot is added or removed, drop future auto-generated
+   * lessons (scheduled, not yet started) and regenerate from the current
+   * schedules. This prevents stale lessons from a changed/removed slot
+   * lingering on the calendar at the old times. Past, completed, cancelled, and
+   * manually rescheduled lessons (originalStartTime set) are left untouched.
+   */
+  private async resyncFutureLessons(courseId: string) {
+    const futureLessons = await this.lessonRepository.find({
+      course: courseId,
+      startTime: { $gt: new Date() },
+      status: LessonStatus.SCHEDULED,
+      originalStartTime: null,
+    });
+    if (futureLessons.length > 0) {
+      await this.em.removeAndFlush(futureLessons);
+    }
+    await this.lessonGenerator.generateLessonsForCourse(courseId);
   }
 
   // Hours management

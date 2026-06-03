@@ -2,8 +2,12 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { EntityManager, EntityRepository } from "@mikro-orm/core";
 import { InjectRepository } from "@mikro-orm/nestjs";
+import { formatInTimeZone, zonedTimeToUtc } from "date-fns-tz";
 import { Course } from "../courses/entities/course.entity";
 import { Lesson, LessonStatus } from "./entities/lesson.entity";
+import { SCHEDULE_TIMEZONE } from "./schedule-timezone";
+
+const GENERATION_WINDOW_DAYS = 28;
 
 @Injectable()
 export class LessonGeneratorService {
@@ -27,71 +31,10 @@ export class LessonGeneratorService {
     );
 
     for (const course of courses) {
-      const schedules = course.schedules.getItems();
-      if (schedules.length === 0) continue;
-
-      const students = course.students.getItems();
-      if (students.length === 0) continue;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const fourWeeksOut = new Date(today);
-      fourWeeksOut.setDate(fourWeeksOut.getDate() + 28);
-
-      const courseStart = new Date(course.startDate);
-      courseStart.setHours(0, 0, 0, 0);
-
-      const lessonsToCreate: Lesson[] = [];
-
-      for (const schedule of schedules) {
-        // Walk each day from today (or course start, whichever is later) to 4 weeks out
-        const start = courseStart > today ? courseStart : today;
-        const current = new Date(start);
-
-        while (current <= fourWeeksOut) {
-          if (current.getDay() === schedule.dayOfWeek) {
-            // Build the lesson start/end times
-            const [startH, startM] = schedule.startTime.split(":").map(Number);
-            const [endH, endM] = schedule.endTime.split(":").map(Number);
-
-            const lessonStart = new Date(current);
-            lessonStart.setHours(startH, startM, 0, 0);
-
-            const lessonEnd = new Date(current);
-            lessonEnd.setHours(endH, endM, 0, 0);
-
-            // Skip if lesson already exists for this course + time
-            const existing = await this.lessonRepository.count({
-              course: course.id,
-              startTime: lessonStart,
-              status: { $ne: LessonStatus.CANCELLED },
-            });
-
-            if (existing === 0) {
-              const lesson = new Lesson(
-                course.tutor,
-                course,
-                lessonStart,
-                lessonEnd,
-              );
-              for (const student of students) {
-                lesson.students.add(student);
-              }
-
-              lessonsToCreate.push(lesson);
-            }
-          }
-
-          current.setDate(current.getDate() + 1);
-        }
-      }
-
-      if (lessonsToCreate.length > 0) {
-        await this.em.persistAndFlush(lessonsToCreate);
-
+      const created = await this.buildLessonsForCourse(course);
+      if (created > 0) {
         this.logger.log(
-          `Generated ${lessonsToCreate.length} lessons for course "${course.title}"`,
+          `Generated ${created} lessons for course "${course.title}"`,
         );
       }
     }
@@ -107,71 +50,111 @@ export class LessonGeneratorService {
 
     if (!course) return;
 
+    const created = await this.buildLessonsForCourse(course);
+    if (created > 0) {
+      this.logger.log(
+        `Generated ${created} lessons for course "${course.title}"`,
+      );
+    }
+  }
+
+  /**
+   * Generate any missing lessons for a single course over the upcoming window.
+   *
+   * Schedule times are wall-clock times in SCHEDULE_TIMEZONE. We walk the
+   * window by calendar date (a date's day-of-week is timezone-independent) and
+   * build each lesson instant with zonedTimeToUtc, so the stored UTC instant is
+   * correct regardless of the server's local timezone. Returns the number of
+   * lessons created.
+   */
+  private async buildLessonsForCourse(course: Course): Promise<number> {
     const schedules = course.schedules.getItems();
-    if (schedules.length === 0) return;
+    if (schedules.length === 0) return 0;
 
     const students = course.students.getItems();
-    if (students.length === 0) return;
+    if (students.length === 0) return 0;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const fourWeeksOut = new Date(today);
-    fourWeeksOut.setDate(fourWeeksOut.getDate() + 28);
-
-    const courseStart = new Date(course.startDate);
-    courseStart.setHours(0, 0, 0, 0);
+    // Window boundaries as school-zone calendar dates (yyyy-MM-dd sorts
+    // chronologically, so plain string comparison is safe).
+    const todayStr = formatInTimeZone(
+      new Date(),
+      SCHEDULE_TIMEZONE,
+      "yyyy-MM-dd",
+    );
+    const endStr = addDays(todayStr, GENERATION_WINDOW_DAYS);
+    const courseStartStr = formatInTimeZone(
+      course.startDate,
+      SCHEDULE_TIMEZONE,
+      "yyyy-MM-dd",
+    );
+    const startStr = courseStartStr > todayStr ? courseStartStr : todayStr;
 
     const lessonsToCreate: Lesson[] = [];
 
-    for (const schedule of schedules) {
-      const start = courseStart > today ? courseStart : today;
-      const current = new Date(start);
+    for (
+      let dateStr = startStr;
+      dateStr <= endStr;
+      dateStr = addDays(dateStr, 1)
+    ) {
+      const dow = dayOfWeek(dateStr);
 
-      while (current <= fourWeeksOut) {
-        if (current.getDay() === schedule.dayOfWeek) {
-          const [startH, startM] = schedule.startTime.split(":").map(Number);
-          const [endH, endM] = schedule.endTime.split(":").map(Number);
+      for (const schedule of schedules) {
+        if (schedule.dayOfWeek !== dow) continue;
 
-          const lessonStart = new Date(current);
-          lessonStart.setHours(startH, startM, 0, 0);
+        const lessonStart = zonedTimeToUtc(
+          `${dateStr}T${schedule.startTime}:00`,
+          SCHEDULE_TIMEZONE,
+        );
+        const lessonEnd = zonedTimeToUtc(
+          `${dateStr}T${schedule.endTime}:00`,
+          SCHEDULE_TIMEZONE,
+        );
 
-          const lessonEnd = new Date(current);
-          lessonEnd.setHours(endH, endM, 0, 0);
+        // Skip if a non-cancelled lesson already covers this slot — either one
+        // sitting at the instant, or one that was manually rescheduled away from
+        // it (originalStartTime). The latter stops us recreating an occurrence a
+        // tutor already moved.
+        const existing = await this.lessonRepository.count({
+          course: course.id,
+          status: { $ne: LessonStatus.CANCELLED },
+          $or: [{ startTime: lessonStart }, { originalStartTime: lessonStart }],
+        });
+        if (existing > 0) continue;
 
-          const existing = await this.lessonRepository.count({
-            course: course.id,
-            startTime: lessonStart,
-            status: { $ne: LessonStatus.CANCELLED },
-          });
-
-          if (existing === 0) {
-            const lesson = new Lesson(
-              course.tutor,
-              course,
-              lessonStart,
-              lessonEnd,
-            );
-            for (const student of students) {
-              lesson.students.add(student);
-            }
-            lessonsToCreate.push(lesson);
-          }
+        const lesson = new Lesson(course.tutor, course, lessonStart, lessonEnd);
+        for (const student of students) {
+          lesson.students.add(student);
         }
-
-        current.setDate(current.getDate() + 1);
+        lessonsToCreate.push(lesson);
       }
     }
 
     if (lessonsToCreate.length > 0) {
       await this.em.persistAndFlush(lessonsToCreate);
-      this.logger.log(
-        `Generated ${lessonsToCreate.length} lessons for course "${course.title}"`,
-      );
     }
+
+    return lessonsToCreate.length;
   }
 
   async generateAppointments() {
     return this.generateLessons();
   }
+}
+
+/** Parse a yyyy-MM-dd string into a UTC Date at midnight (timezone-independent). */
+function parseDateString(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+/** Add `n` calendar days to a yyyy-MM-dd string, returning a yyyy-MM-dd string. */
+function addDays(dateStr: string, n: number): string {
+  const date = parseDateString(dateStr);
+  date.setUTCDate(date.getUTCDate() + n);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Day of week (0=Sunday..6=Saturday) for a yyyy-MM-dd calendar date. */
+function dayOfWeek(dateStr: string): number {
+  return parseDateString(dateStr).getUTCDay();
 }

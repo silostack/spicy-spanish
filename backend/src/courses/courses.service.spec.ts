@@ -5,6 +5,8 @@ import { getRepositoryToken } from "@mikro-orm/nestjs";
 import { CoursesService } from "./courses.service";
 import { Course } from "./entities/course.entity";
 import { CourseSchedule } from "./entities/course-schedule.entity";
+import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
+import { LessonGeneratorService } from "../scheduling/lesson-generator.service";
 import { User, UserRole } from "../users/entities/user.entity";
 
 type MockRepo = Record<string, jest.Mock>;
@@ -13,8 +15,10 @@ describe("CoursesService", () => {
   let service: CoursesService;
   let courseRepo: MockRepo;
   let scheduleRepo: MockRepo;
+  let lessonRepo: MockRepo;
   let userRepo: MockRepo;
   let em: Record<string, jest.Mock>;
+  let lessonGenerator: Record<string, jest.Mock>;
 
   const mockTutor = {
     id: "tutor-1",
@@ -77,6 +81,10 @@ describe("CoursesService", () => {
       find: jest.fn(),
     };
 
+    lessonRepo = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     userRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -89,13 +97,19 @@ describe("CoursesService", () => {
       assign: jest.fn(),
     };
 
+    lessonGenerator = {
+      generateLessonsForCourse: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CoursesService,
         { provide: getRepositoryToken(Course), useValue: courseRepo },
         { provide: getRepositoryToken(CourseSchedule), useValue: scheduleRepo },
+        { provide: getRepositoryToken(Lesson), useValue: lessonRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: EntityManager, useValue: em },
+        { provide: LessonGeneratorService, useValue: lessonGenerator },
       ],
     }).compile();
 
@@ -119,7 +133,10 @@ describe("CoursesService", () => {
       expect(result).toEqual([mockCourse]);
       expect(courseRepo.findAll).toHaveBeenCalledWith({
         populate: ["tutor", "students", "schedules"],
-        orderBy: { title: "ASC" },
+        orderBy: {
+          title: "ASC",
+          schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+        },
       });
     });
   });
@@ -135,7 +152,10 @@ describe("CoursesService", () => {
         { isActive: true },
         {
           populate: ["tutor", "students", "schedules"],
-          orderBy: { title: "ASC" },
+          orderBy: {
+            title: "ASC",
+            schedules: { dayOfWeek: "ASC", startTime: "ASC" },
+          },
         },
       );
     });
@@ -150,7 +170,10 @@ describe("CoursesService", () => {
       expect(result).toBe(mockCourse);
       expect(courseRepo.findOne).toHaveBeenCalledWith(
         { id: "course-1" },
-        { populate: ["tutor", "students", "schedules"] },
+        {
+          populate: ["tutor", "students", "schedules"],
+          orderBy: { schedules: { dayOfWeek: "ASC", startTime: "ASC" } },
+        },
       );
     });
 
@@ -305,18 +328,33 @@ describe("CoursesService", () => {
       expect(result.dayOfWeek).toBe(1);
       expect(result.startTime).toBe("14:00");
       expect(result.endTime).toBe("15:00");
+      // Future lessons are resynced from the updated schedules, preserving
+      // manually rescheduled ones (originalStartTime set).
+      expect(lessonRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          course: "course-1",
+          status: LessonStatus.SCHEDULED,
+          originalStartTime: null,
+        }),
+      );
+      expect(lessonGenerator.generateLessonsForCourse).toHaveBeenCalledWith(
+        "course-1",
+      );
     });
   });
 
   describe("removeSchedule", () => {
-    it("should remove a schedule slot", async () => {
-      const mockSchedule = { id: "sched-1" };
+    it("should remove a schedule slot and resync future lessons", async () => {
+      const mockSchedule = { id: "sched-1", course: { id: "course-1" } };
       scheduleRepo.findOne.mockResolvedValue(mockSchedule);
       em.removeAndFlush.mockResolvedValue(undefined);
 
       const result = await service.removeSchedule("sched-1");
 
       expect(result).toEqual({ id: "sched-1", deleted: true });
+      expect(lessonGenerator.generateLessonsForCourse).toHaveBeenCalledWith(
+        "course-1",
+      );
     });
 
     it("should throw NotFoundException when schedule not found", async () => {

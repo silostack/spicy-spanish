@@ -122,12 +122,16 @@ export class SchedulingService {
     const populate = ["students", "tutor", "course"] as const;
 
     if (category === "date-range" && startDate && endDate) {
+      // startDate/endDate arrive as ISO instants (the visible calendar grid's
+      // start/end), so parse them directly rather than re-anchoring to the
+      // server's local timezone — this keeps the query window aligned with what
+      // the frontend renders and stops edge lessons from being dropped.
       return this.lessonRepository.find(
         {
           course: courseId,
           startTime: {
-            $gte: new Date(`${startDate}T00:00:00`),
-            $lte: new Date(`${endDate}T23:59:59.999`),
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
           },
         },
         { populate, orderBy: { startTime: "ASC" } },
@@ -442,6 +446,14 @@ export class SchedulingService {
       throw new BadRequestException(
         "The selected time conflicts with another lesson",
       );
+    }
+
+    // Capture the original (auto-generated) instant on the first reschedule
+    // only, so repeated reschedules keep pointing at the true slot anchor. This
+    // marks the lesson as manually rescheduled and tells the generator that
+    // occurrence is already accounted for.
+    if (lesson.originalStartTime == null) {
+      lesson.originalStartTime = lesson.startTime;
     }
 
     lesson.startTime = dto.startTime;

@@ -38,6 +38,13 @@ export class Lesson {
   @Property()
   endTime: Date;
 
+  // Set on the first manual reschedule to the lesson's original (auto-generated)
+  // start instant. Null means the lesson is still purely auto-generated. Used to
+  // preserve manual reschedules when schedules change, and to stop the generator
+  // from recreating an occurrence that was moved away from its slot.
+  @Property({ nullable: true })
+  originalStartTime?: Date;
+
   @Enum(() => LessonStatus)
   status: LessonStatus = LessonStatus.SCHEDULED;
 

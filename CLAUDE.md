@@ -109,3 +109,4 @@ GitHub Actions runs on every push/PR to `main`:
 - Backend expects PostgreSQL with environment variables for MikroORM
 - Rate limiting is enabled (100 requests per minute per IP via @nestjs/throttler)
 - CORS in production restricts to `FRONTEND_URL` env var
+- Course schedule times ("HH:MM" on `CourseSchedule`) are wall-clock times in the school timezone set by `SCHEDULE_TIMEZONE` (default `America/Bogota`). Lesson generation anchors them to this zone via `date-fns-tz`, so generated lesson instants are independent of the server's local timezone. Lessons are displayed in each viewer's local timezone on the frontend.
