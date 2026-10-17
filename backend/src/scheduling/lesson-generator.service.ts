@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { EntityManager, EntityRepository } from "@mikro-orm/core";
-import { InjectRepository } from "@mikro-orm/nestjs";
+import { EntityManager } from "@mikro-orm/core";
 import { formatInTimeZone, zonedTimeToUtc } from "date-fns-tz";
 import { Course } from "../courses/entities/course.entity";
 import { Lesson, LessonStatus } from "./entities/lesson.entity";
@@ -13,25 +12,25 @@ const GENERATION_WINDOW_DAYS = 28;
 export class LessonGeneratorService {
   private readonly logger = new Logger(LessonGeneratorService.name);
 
-  constructor(
-    @InjectRepository(Course)
-    private readonly courseRepository: EntityRepository<Course>,
-    @InjectRepository(Lesson)
-    private readonly lessonRepository: EntityRepository<Lesson>,
-    private readonly em: EntityManager,
-  ) {}
+  constructor(private readonly em: EntityManager) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async generateLessons() {
     this.logger.log("Starting lesson generation...");
 
-    const courses = await this.courseRepository.find(
+    // The cron trigger runs outside any request context, so the globally
+    // injected EntityManager can't be used for writes (MikroORM rejects
+    // global-context persistence). Fork a dedicated context for this run.
+    const em = this.em.fork();
+
+    const courses = await em.find(
+      Course,
       { isActive: true },
       { populate: ["tutor", "students", "schedules"] },
     );
 
     for (const course of courses) {
-      const created = await this.buildLessonsForCourse(course);
+      const created = await this.buildLessonsForCourse(course, em);
       if (created > 0) {
         this.logger.log(
           `Generated ${created} lessons for course "${course.title}"`,
@@ -43,14 +42,17 @@ export class LessonGeneratorService {
   }
 
   async generateLessonsForCourse(courseId: string) {
-    const course = await this.courseRepository.findOne(
+    const em = this.em.fork();
+
+    const course = await em.findOne(
+      Course,
       { id: courseId, isActive: true },
       { populate: ["tutor", "students", "schedules"] },
     );
 
     if (!course) return;
 
-    const created = await this.buildLessonsForCourse(course);
+    const created = await this.buildLessonsForCourse(course, em);
     if (created > 0) {
       this.logger.log(
         `Generated ${created} lessons for course "${course.title}"`,
@@ -67,7 +69,10 @@ export class LessonGeneratorService {
    * correct regardless of the server's local timezone. Returns the number of
    * lessons created.
    */
-  private async buildLessonsForCourse(course: Course): Promise<number> {
+  private async buildLessonsForCourse(
+    course: Course,
+    em: EntityManager,
+  ): Promise<number> {
     const schedules = course.schedules.getItems();
     if (schedules.length === 0) return 0;
 
@@ -114,7 +119,7 @@ export class LessonGeneratorService {
         // sitting at the instant, or one that was manually rescheduled away from
         // it (originalStartTime). The latter stops us recreating an occurrence a
         // tutor already moved.
-        const existing = await this.lessonRepository.count({
+        const existing = await em.count(Lesson, {
           course: course.id,
           status: { $ne: LessonStatus.CANCELLED },
           $or: [{ startTime: lessonStart }, { originalStartTime: lessonStart }],
@@ -130,7 +135,7 @@ export class LessonGeneratorService {
     }
 
     if (lessonsToCreate.length > 0) {
-      await this.em.persistAndFlush(lessonsToCreate);
+      await em.persistAndFlush(lessonsToCreate);
     }
 
     return lessonsToCreate.length;
