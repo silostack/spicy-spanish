@@ -16,10 +16,13 @@ import RangePicker, {
 } from './lessons-calendar/RangePicker';
 import TotalsStrip from './lessons-calendar/TotalsStrip';
 import LessonDetailPanel from './lesson-panel/LessonDetailPanel';
+import LogPastClassPanel from './lesson-panel/LogPastClassPanel';
 import { useLessons } from './hooks/useLessons';
+import { Course, Lesson } from './types';
 
 interface Props {
   courseId: string;
+  course: Course;
   userRole: string;
   onCourseDataChanged: () => void;
 }
@@ -28,9 +31,11 @@ const WEEK_OPTS = { weekStartsOn: 1 as const };
 
 export default function LessonsTab({
   courseId,
+  course,
   userRole,
   onCourseDataChanged,
 }: Props) {
+  const isAdmin = userRole === 'admin';
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => new Date());
   const [range, setRange] = useState<ResolvedRange>(() => {
     const { start, end } = presetRange('this-month');
@@ -39,6 +44,8 @@ export default function LessonsTab({
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(
     null,
   );
+  // yyyy-MM-dd ('' = no date yet) while the "log past class" panel is open.
+  const [pastClassDate, setPastClassDate] = useState<string | null>(null);
 
   // Fetch lessons covering both the visible month grid and the selected range,
   // so chips appear everywhere they should.
@@ -68,19 +75,37 @@ export default function LessonsTab({
     onCourseDataChanged();
   };
 
+  const handlePastClassLogged = async (lesson: Lesson) => {
+    setPastClassDate(null);
+    setVisibleMonth(new Date(lesson.startTime));
+    await handleChanged();
+    setSelectedLessonId(lesson.id);
+  };
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="text-[11px] uppercase tracking-[0.16em] text-spicy-dark/45">
           {loading ? 'Loading lessons…' : `${lessons.length} lessons in view`}
         </div>
-        <RangePicker
-          value={range}
-          onChange={(next) => {
-            setRange(next);
-            setVisibleMonth(next.end);
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setPastClassDate('')}
+              className="rounded-full border border-spicy-dark/15 bg-white px-4 py-2 text-sm font-medium text-spicy-dark transition-colors hover:border-spicy-dark/40"
+            >
+              + Log past class
+            </button>
+          )}
+          <RangePicker
+            value={range}
+            onChange={(next) => {
+              setRange(next);
+              setVisibleMonth(next.end);
+            }}
+          />
+        </div>
       </div>
 
       <TotalsStrip
@@ -103,6 +128,7 @@ export default function LessonsTab({
             rangeEnd={range.end}
             selectedLessonId={selectedLessonId}
             onSelectLesson={setSelectedLessonId}
+            onSelectPastDay={isAdmin ? setPastClassDate : undefined}
           />
         </div>
       )}
@@ -119,6 +145,17 @@ export default function LessonsTab({
         onClose={() => setSelectedLessonId(null)}
         onChanged={handleChanged}
       />
+
+      {isAdmin && (
+        <LogPastClassPanel
+          initialDate={pastClassDate}
+          courseId={courseId}
+          students={course.students}
+          lessons={lessons}
+          onClose={() => setPastClassDate(null)}
+          onDone={handlePastClassLogged}
+        />
+      )}
     </div>
   );
 }

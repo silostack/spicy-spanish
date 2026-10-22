@@ -22,6 +22,7 @@ import {
   CancelLessonDto,
   CompleteLessonDto,
   RescheduleLessonDto,
+  LogPastLessonDto,
   CreateAvailabilityDto,
   UpdateAvailabilityDto,
   CreateAttendanceDto,
@@ -68,6 +69,16 @@ export class SchedulingController {
       startDate,
       endDate,
     );
+  }
+
+  @Post("courses/:courseId/past-lessons")
+  @Roles(UserRole.ADMIN)
+  async logPastLesson(
+    @Param("courseId") courseId: string,
+    @Body() dto: LogPastLessonDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.schedulingService.logPastLesson(courseId, dto, req.user);
   }
 
   @Get("students/:id/lessons")

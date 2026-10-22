@@ -21,6 +21,7 @@ import {
   CancelLessonDto,
   CompleteLessonDto,
   RescheduleLessonDto,
+  LogPastLessonDto,
   CreateAvailabilityDto,
   UpdateAvailabilityDto,
   CreateAttendanceDto,
@@ -501,107 +502,12 @@ export class SchedulingService {
         );
       }
 
-      const lessonStudents = lesson.students.getItems();
-      const lessonStudentIds = new Set(
-        lessonStudents.map((student) => student.id),
+      const { attendances, report } = await this.recordCompletion(
+        em,
+        lesson,
+        dto,
+        actor,
       );
-      const payloadStudentIds = dto.attendances.map((item) => item.studentId);
-      const uniquePayloadStudentIds = new Set(payloadStudentIds);
-
-      if (uniquePayloadStudentIds.size !== payloadStudentIds.length) {
-        throw new BadRequestException(
-          "Attendance payload contains duplicate students",
-        );
-      }
-
-      if (uniquePayloadStudentIds.size !== lessonStudentIds.size) {
-        throw new BadRequestException(
-          "Attendance must include exactly one entry for each lesson student",
-        );
-      }
-
-      for (const studentId of uniquePayloadStudentIds) {
-        if (!lessonStudentIds.has(studentId)) {
-          throw new BadRequestException(
-            `Student ${studentId} is not enrolled in this lesson`,
-          );
-        }
-      }
-
-      const attendances: Attendance[] = [];
-      for (const item of dto.attendances) {
-        const student = lessonStudents.find(
-          (candidate) => candidate.id === item.studentId,
-        );
-        if (!student) {
-          throw new BadRequestException(
-            `Student ${item.studentId} not found on lesson`,
-          );
-        }
-
-        const existingAttendance = await em.findOne(Attendance, {
-          lesson,
-          student,
-        });
-        if (existingAttendance) {
-          throw new BadRequestException(
-            `Attendance already exists for student ${item.studentId} in this lesson`,
-          );
-        }
-
-        const attendance = new Attendance(
-          lesson,
-          student,
-          item.status,
-          item.notes,
-          actor.role === UserRole.TUTOR,
-        );
-        em.persist(attendance);
-        attendances.push(attendance);
-      }
-
-      let report: ClassReport | null = null;
-      if (dto.report) {
-        const existingReport = await em.findOne(ClassReport, { lesson });
-        if (existingReport) {
-          throw new BadRequestException(
-            "Class report already exists for this lesson",
-          );
-        }
-
-        report = new ClassReport(
-          lesson,
-          actor.role === UserRole.TUTOR ? actor : lesson.tutor,
-          dto.report.subject,
-          dto.report.content,
-          dto.report.homeworkAssigned,
-          dto.report.studentProgress,
-          dto.report.nextLessonNotes,
-        );
-        em.persist(report);
-      }
-
-      lesson.status = LessonStatus.COMPLETED;
-
-      const durationHours =
-        (lesson.endTime.getTime() - lesson.startTime.getTime()) /
-        (1000 * 60 * 60);
-      lesson.course.hoursBalance =
-        Number(lesson.course.hoursBalance) - durationHours;
-      lesson.course.needsRenewal = lesson.course.hoursBalance <= 0;
-
-      if (lesson.googleCalendarEventId) {
-        const studentNames = lesson.students
-          .getItems()
-          .map((student) => student.fullName)
-          .join(", ");
-        await this.googleCalendar.updateEvent(lesson.googleCalendarEventId, {
-          summary: `Spanish Class: ${studentNames} with ${lesson.tutor.fullName} (Completed)`,
-          description: lesson.notes,
-          startTime: lesson.startTime,
-          endTime: lesson.endTime,
-        });
-      }
 
       await em.flush();
 
@@ -611,6 +517,210 @@ export class SchedulingService {
         report,
       };
     });
+  }
+
+  async logPastLesson(courseId: string, dto: LogPastLessonDto, actor: User) {
+    return this.em.transactional(async (em) => {
+      const course = await em.findOne(
+        Course,
+        { id: courseId },
+        { populate: ["tutor", "students"] },
+      );
+      if (!course) {
+        throw new NotFoundException(`Course with ID ${courseId} not found`);
+      }
+
+      const startTime = new Date(dto.startTime);
+      const endTime = new Date(dto.endTime);
+      if (endTime <= startTime) {
+        throw new BadRequestException("End time must be after start time");
+      }
+      if (startTime >= new Date()) {
+        throw new BadRequestException("Past classes must start in the past");
+      }
+
+      const courseStudents = course.students.getItems();
+      const studentIds = dto.attendances.map((item) => item.studentId);
+      if (new Set(studentIds).size !== studentIds.length) {
+        throw new BadRequestException(
+          "Attendance payload contains duplicate students",
+        );
+      }
+      const students: User[] = [];
+      for (const studentId of studentIds) {
+        const student = courseStudents.find(
+          (candidate) => candidate.id === studentId,
+        );
+        if (!student) {
+          throw new BadRequestException(
+            `Student ${studentId} is not enrolled in this course`,
+          );
+        }
+        students.push(student);
+      }
+
+      const overlapping = await this.findOverlappingLesson(
+        em,
+        course.tutor.id,
+        startTime,
+        endTime,
+      );
+      if (overlapping) {
+        const isOpenLessonOfCourse =
+          overlapping.status === LessonStatus.SCHEDULED &&
+          overlapping.course.id === course.id;
+        throw new BadRequestException(
+          isOpenLessonOfCourse
+            ? "A lesson is already scheduled at this time — log attendance on that lesson instead"
+            : "The tutor already has a lesson that overlaps this time",
+        );
+      }
+
+      // A past class is recorded, not announced: no calendar event, and the
+      // email flags are set so no reminder/confirmation job ever picks it up.
+      const lesson = new Lesson(course.tutor, course, startTime, endTime);
+      for (const student of students) {
+        lesson.students.add(student);
+      }
+      if (dto.notes) {
+        lesson.notes = dto.notes;
+      }
+      lesson.confirmationEmailSent = true;
+      lesson.reminderSent = true;
+      lesson.dayBeforeReminderSent = true;
+      em.persist(lesson);
+
+      const { attendances, report } = await this.recordCompletion(
+        em,
+        lesson,
+        { attendances: dto.attendances, report: dto.report },
+        actor,
+      );
+
+      await em.flush();
+
+      return {
+        lesson,
+        attendances,
+        report,
+      };
+    });
+  }
+
+  /**
+   * Shared completion step for a lesson: records one attendance per lesson
+   * student, the optional class report, marks the lesson completed and deducts
+   * its duration from the course's hours balance. Callers flush.
+   */
+  private async recordCompletion(
+    em: EntityManager,
+    lesson: Lesson,
+    dto: CompleteLessonDto,
+    actor: User,
+  ): Promise<{ attendances: Attendance[]; report: ClassReport | null }> {
+    const lessonStudents = lesson.students.getItems();
+    const lessonStudentIds = new Set(
+      lessonStudents.map((student) => student.id),
+    );
+    const payloadStudentIds = dto.attendances.map((item) => item.studentId);
+    const uniquePayloadStudentIds = new Set(payloadStudentIds);
+
+    if (uniquePayloadStudentIds.size !== payloadStudentIds.length) {
+      throw new BadRequestException(
+        "Attendance payload contains duplicate students",
+      );
+    }
+
+    if (uniquePayloadStudentIds.size !== lessonStudentIds.size) {
+      throw new BadRequestException(
+        "Attendance must include exactly one entry for each lesson student",
+      );
+    }
+
+    for (const studentId of uniquePayloadStudentIds) {
+      if (!lessonStudentIds.has(studentId)) {
+        throw new BadRequestException(
+          `Student ${studentId} is not enrolled in this lesson`,
+        );
+      }
+    }
+
+    const attendances: Attendance[] = [];
+    for (const item of dto.attendances) {
+      const student = lessonStudents.find(
+        (candidate) => candidate.id === item.studentId,
+      );
+      if (!student) {
+        throw new BadRequestException(
+          `Student ${item.studentId} not found on lesson`,
+        );
+      }
+
+      const existingAttendance = await em.findOne(Attendance, {
+        lesson,
+        student,
+      });
+      if (existingAttendance) {
+        throw new BadRequestException(
+          `Attendance already exists for student ${item.studentId} in this lesson`,
+        );
+      }
+
+      const attendance = new Attendance(
+        lesson,
+        student,
+        item.status,
+        item.notes,
+        actor.role === UserRole.TUTOR,
+      );
+      em.persist(attendance);
+      attendances.push(attendance);
+    }
+
+    let report: ClassReport | null = null;
+    if (dto.report) {
+      const existingReport = await em.findOne(ClassReport, { lesson });
+      if (existingReport) {
+        throw new BadRequestException(
+          "Class report already exists for this lesson",
+        );
+      }
+
+      report = new ClassReport(
+        lesson,
+        actor.role === UserRole.TUTOR ? actor : lesson.tutor,
+        dto.report.subject,
+        dto.report.content,
+        dto.report.homeworkAssigned,
+        dto.report.studentProgress,
+        dto.report.nextLessonNotes,
+      );
+      em.persist(report);
+    }
+
+    lesson.status = LessonStatus.COMPLETED;
+
+    const durationHours =
+      (lesson.endTime.getTime() - lesson.startTime.getTime()) /
+      (1000 * 60 * 60);
+    lesson.course.hoursBalance =
+      Number(lesson.course.hoursBalance) - durationHours;
+    lesson.course.needsRenewal = lesson.course.hoursBalance <= 0;
+
+    if (lesson.googleCalendarEventId) {
+      const studentNames = lesson.students
+        .getItems()
+        .map((student) => student.fullName)
+        .join(", ");
+      await this.googleCalendar.updateEvent(lesson.googleCalendarEventId, {
+        summary: `Spanish Class: ${studentNames} with ${lesson.tutor.fullName} (Completed)`,
+        description: lesson.notes,
+        startTime: lesson.startTime,
+        endTime: lesson.endTime,
+      });
+    }
+
+    return { attendances, report };
   }
 
   // Availability methods
@@ -1007,6 +1117,26 @@ export class SchedulingService {
 
     const conflictingLessons = await this.lessonRepository.count(query);
     return conflictingLessons > 0;
+  }
+
+  // Unlike checkTimeConflicts this also counts completed/no-show lessons, so a
+  // class that was already logged can't be recorded a second time.
+  private async findOverlappingLesson(
+    em: EntityManager,
+    tutorId: string,
+    startTime: Date,
+    endTime: Date,
+  ): Promise<Lesson | null> {
+    return em.findOne(
+      Lesson,
+      {
+        tutor: tutorId,
+        status: { $ne: LessonStatus.CANCELLED },
+        startTime: { $lt: endTime },
+        endTime: { $gt: startTime },
+      },
+      { populate: ["course"] },
+    );
   }
 
   // Backwards-compatible aliases for existing internal/tests

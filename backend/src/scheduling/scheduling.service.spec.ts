@@ -21,7 +21,11 @@ jest.mock("./entities/lesson.entity", () => {
   const original = jest.requireActual("./entities/lesson.entity");
   class MockAppointment {
     id = "appt-new";
-    students = { add: jest.fn(), getItems: () => [] };
+    private studentItems: any[] = [];
+    students = {
+      add: jest.fn((student: any) => this.studentItems.push(student)),
+      getItems: () => this.studentItems,
+    };
     tutor: any;
     course: any;
     startTime: Date;
@@ -122,13 +126,24 @@ const mockRepository = () => ({
   count: jest.fn(),
 });
 
-const mockEntityManager = () => ({
-  persistAndFlush: jest.fn(),
-  flush: jest.fn(),
-  removeAndFlush: jest.fn(),
-  assign: jest.fn((entity, dto) => Object.assign(entity, dto)),
-  find: jest.fn(),
-});
+const mockEntityManager = () => {
+  const em = {
+    persistAndFlush: jest.fn(),
+    persist: jest.fn(),
+    flush: jest.fn(),
+    removeAndFlush: jest.fn(),
+    assign: jest.fn((entity, dto) => Object.assign(entity, dto)),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    // Run the transaction callback against the same mock so assertions on
+    // `em` cover work done inside `em.transactional`.
+    transactional: jest.fn(),
+  };
+  em.transactional.mockImplementation((cb: (txEm: typeof em) => unknown) =>
+    cb(em),
+  );
+  return em;
+};
 
 const mockGoogleCalendarService = () => ({
   createEvent: jest.fn().mockResolvedValue("gcal-event-123"),
@@ -974,6 +989,291 @@ describe("SchedulingService", () => {
       expect(result).toHaveProperty("totalScheduledHours");
       expect(result).toHaveProperty("totalCompletedAppointments");
       expect(result).toHaveProperty("totalScheduledAppointments");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Complete lesson (attendance flow)
+  // -----------------------------------------------------------------------
+
+  describe("completeLesson", () => {
+    it("records attendance, marks completed and deducts hours", async () => {
+      const appt = createMockAppointment();
+      const student = appt.students.getItems()[0];
+      em.findOne
+        .mockResolvedValueOnce(appt) // lesson
+        .mockResolvedValueOnce(null); // existing attendance
+
+      const admin = createMockUser({ role: UserRole.ADMIN });
+      const result = await service.completeLesson(
+        "appt-1",
+        {
+          attendances: [
+            { studentId: student.id, status: AttendanceStatus.PRESENT },
+          ],
+        },
+        admin,
+      );
+
+      expect(result.lesson.status).toBe(LessonStatus.COMPLETED);
+      expect(result.attendances).toHaveLength(1);
+      expect(result.report).toBeNull();
+      expect(appt.course.hoursBalance).toBe(4);
+      expect(em.flush).toHaveBeenCalled();
+    });
+
+    it("rejects a lesson that is not scheduled", async () => {
+      em.findOne.mockResolvedValueOnce(
+        createMockAppointment({ status: LessonStatus.COMPLETED }),
+      );
+      await expect(
+        service.completeLesson(
+          "appt-1",
+          { attendances: [] },
+          createMockUser({ role: UserRole.ADMIN }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Log past lesson
+  // -----------------------------------------------------------------------
+
+  describe("logPastLesson", () => {
+    const tutor = createMockUser({
+      role: UserRole.TUTOR,
+      firstName: "Tu",
+      lastName: "Tor",
+    });
+    const alice = createMockUser({ role: UserRole.STUDENT, id: "stu-a" });
+    const bob = createMockUser({ role: UserRole.STUDENT, id: "stu-b" });
+    const admin = createMockUser({ role: UserRole.ADMIN });
+
+    const pastStart = "2026-01-05T15:00:00.000Z";
+    const pastEnd = "2026-01-05T16:30:00.000Z";
+
+    let course: any;
+
+    beforeEach(() => {
+      course = {
+        id: "course-1",
+        tutor,
+        students: { getItems: () => [alice, bob] },
+        hoursBalance: 1,
+        needsRenewal: false,
+      };
+      // Default: course lookup, then no overlap / existing rows.
+      em.findOne.mockImplementation(async (entity: unknown) =>
+        entity === Course ? course : null,
+      );
+    });
+
+    it("creates a completed lesson with attendance and deducts hours", async () => {
+      const result = await service.logPastLesson(
+        "course-1",
+        {
+          startTime: pastStart as unknown as Date,
+          endTime: pastEnd as unknown as Date,
+          attendances: [
+            { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            { studentId: "stu-b", status: AttendanceStatus.ABSENT },
+          ],
+        },
+        admin,
+      );
+
+      expect(result.lesson.status).toBe(LessonStatus.COMPLETED);
+      expect(result.lesson.startTime).toEqual(new Date(pastStart));
+      expect(result.lesson.students.getItems()).toEqual([alice, bob]);
+      expect(result.lesson.reminderSent).toBe(true);
+      expect(result.lesson.dayBeforeReminderSent).toBe(true);
+      expect(result.lesson.confirmationEmailSent).toBe(true);
+      expect(result.attendances.map((a) => a.status)).toEqual([
+        AttendanceStatus.PRESENT,
+        AttendanceStatus.ABSENT,
+      ]);
+      expect(result.attendances.every((a) => !a.markedByTutor)).toBe(true);
+      expect(course.hoursBalance).toBe(-0.5);
+      expect(course.needsRenewal).toBe(true);
+      expect(em.persist).toHaveBeenCalledWith(result.lesson);
+      expect(em.flush).toHaveBeenCalled();
+      expect(googleCalendar.createEvent).not.toHaveBeenCalled();
+      expect(googleCalendar.updateEvent).not.toHaveBeenCalled();
+      expect(emailService.sendClassConfirmationEmail).not.toHaveBeenCalled();
+    });
+
+    it("allows logging a subset of the course students", async () => {
+      const result = await service.logPastLesson(
+        "course-1",
+        {
+          startTime: pastStart as unknown as Date,
+          endTime: pastEnd as unknown as Date,
+          attendances: [
+            { studentId: "stu-b", status: AttendanceStatus.PRESENT },
+          ],
+        },
+        admin,
+      );
+      expect(result.lesson.students.getItems()).toEqual([bob]);
+      expect(result.attendances).toHaveLength(1);
+    });
+
+    it("creates a class report attributed to the course tutor", async () => {
+      const result = await service.logPastLesson(
+        "course-1",
+        {
+          startTime: pastStart as unknown as Date,
+          endTime: pastEnd as unknown as Date,
+          attendances: [
+            { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+          ],
+          report: { subject: "Preterite", content: "Covered -ar verbs" },
+        },
+        admin,
+      );
+      expect(result.report).not.toBeNull();
+      expect(result.report!.tutor).toBe(tutor);
+      expect(result.report!.subject).toBe("Preterite");
+    });
+
+    it("throws NotFoundException for an unknown course", async () => {
+      em.findOne.mockResolvedValue(null);
+      await expect(
+        service.logPastLesson(
+          "missing",
+          {
+            startTime: pastStart as unknown as Date,
+            endTime: pastEnd as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("rejects a class that starts in the future", async () => {
+      const future = new Date(Date.now() + 60 * 60 * 1000);
+      const futureEnd = new Date(future.getTime() + 60 * 60 * 1000);
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: future.toISOString() as unknown as Date,
+            endTime: futureEnd.toISOString() as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow("Past classes must start in the past");
+    });
+
+    it("rejects an end time that is not after the start time", async () => {
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: pastEnd as unknown as Date,
+            endTime: pastStart as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow("End time must be after start time");
+    });
+
+    it("rejects a student who is not enrolled in the course", async () => {
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: pastStart as unknown as Date,
+            endTime: pastEnd as unknown as Date,
+            attendances: [
+              { studentId: "stranger", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow("Student stranger is not enrolled in this course");
+    });
+
+    it("rejects duplicate students", async () => {
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: pastStart as unknown as Date,
+            endTime: pastEnd as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+              { studentId: "stu-a", status: AttendanceStatus.ABSENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow("Attendance payload contains duplicate students");
+    });
+
+    it("rejects a class overlapping an existing lesson of the tutor", async () => {
+      em.findOne.mockImplementation(async (entity: unknown) => {
+        if (entity === Course) return course;
+        if (entity === Lesson) {
+          return {
+            status: LessonStatus.COMPLETED,
+            course: { id: "course-1" },
+          };
+        }
+        return null;
+      });
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: pastStart as unknown as Date,
+            endTime: pastEnd as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow(
+        "The tutor already has a lesson that overlaps this time",
+      );
+      expect(em.persist).not.toHaveBeenCalled();
+    });
+
+    it("points to the existing lesson when it is still awaiting attendance", async () => {
+      em.findOne.mockImplementation(async (entity: unknown) => {
+        if (entity === Course) return course;
+        if (entity === Lesson) {
+          return {
+            status: LessonStatus.SCHEDULED,
+            course: { id: "course-1" },
+          };
+        }
+        return null;
+      });
+      await expect(
+        service.logPastLesson(
+          "course-1",
+          {
+            startTime: pastStart as unknown as Date,
+            endTime: pastEnd as unknown as Date,
+            attendances: [
+              { studentId: "stu-a", status: AttendanceStatus.PRESENT },
+            ],
+          },
+          admin,
+        ),
+      ).rejects.toThrow(/log attendance on that lesson instead/);
     });
   });
 

@@ -24,6 +24,9 @@ interface Props {
   rangeEnd: Date;
   selectedLessonId: string | null;
   onSelectLesson: (lessonId: string) => void;
+  // When set, clicking a day up to today (outside a lesson chip) calls this
+  // with the day as yyyy-MM-dd — used to log a past, unscheduled class.
+  onSelectPastDay?: (dayKey: string) => void;
 }
 
 const WEEK_OPTS = { weekStartsOn: 1 as const };
@@ -37,6 +40,7 @@ export default function LessonsCalendar({
   rangeEnd,
   selectedLessonId,
   onSelectLesson,
+  onSelectPastDay,
 }: Props) {
   const days = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(visibleMonth), WEEK_OPTS);
@@ -68,6 +72,7 @@ export default function LessonsCalendar({
   }, [lessons]);
 
   const today = new Date();
+  const todayKey = format(today, 'yyyy-MM-dd');
   const rangeStartKey = format(rangeStart, 'yyyy-MM-dd');
   const rangeEndKey = format(rangeEnd, 'yyyy-MM-dd');
 
@@ -151,13 +156,18 @@ export default function LessonsCalendar({
           const dayLessons = lessonsByDay.get(dayKey) ?? [];
           const visibleLessons = dayLessons.slice(0, 3);
           const overflow = dayLessons.length - visibleLessons.length;
+          const canLogPast = !!onSelectPastDay && dayKey <= todayKey;
 
           return (
             <div
               key={dayKey}
-              className={`relative min-h-[96px] bg-white px-1.5 pb-1.5 pt-1 ${
+              onClick={
+                canLogPast ? () => onSelectPastDay?.(dayKey) : undefined
+              }
+              title={canLogPast ? 'Log a past class on this day' : undefined}
+              className={`group relative min-h-[96px] bg-white px-1.5 pb-1.5 pt-1 ${
                 inMonth ? '' : 'bg-spicy-light/30'
-              }`}
+              } ${canLogPast ? 'cursor-pointer' : ''}`}
               style={
                 inRange
                   ? {
@@ -195,12 +205,22 @@ export default function LessonsCalendar({
                 >
                   {format(day, 'd')}
                 </span>
-                {isToday && (
-                  <span
-                    aria-hidden
-                    className="block h-[2px] w-5 rounded-full bg-spicy-red/70"
-                  />
-                )}
+                <span className="flex items-center gap-1">
+                  {canLogPast && (
+                    <span
+                      aria-hidden
+                      className="text-xs font-semibold leading-none text-spicy-dark/40 opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      +
+                    </span>
+                  )}
+                  {isToday && (
+                    <span
+                      aria-hidden
+                      className="block h-[2px] w-5 rounded-full bg-spicy-red/70"
+                    />
+                  )}
+                </span>
               </div>
 
               {/* Lesson chips */}
@@ -216,7 +236,10 @@ export default function LessonsCalendar({
                 {overflow > 0 && (
                   <button
                     type="button"
-                    onClick={() => onSelectLesson(dayLessons[3].id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectLesson(dayLessons[3].id);
+                    }}
                     className="self-start px-1 text-[10px] font-medium uppercase tracking-wider text-spicy-dark/45 hover:text-spicy-red"
                   >
                     +{overflow} more

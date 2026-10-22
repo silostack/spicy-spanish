@@ -221,6 +221,31 @@ export class CompleteLessonDto {
   report?: CompleteLessonReportDto;
 }
 
+// Logs a class that already happened but was never scheduled: creates a
+// completed lesson at the given past instant together with its attendance.
+export class LogPastLessonDto {
+  @IsDateString()
+  startTime: Date;
+
+  @IsDateString()
+  endTime: Date;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CompleteLessonAttendanceDto)
+  attendances: CompleteLessonAttendanceDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CompleteLessonReportDto)
+  report?: CompleteLessonReportDto;
+}
+
 export class RescheduleLessonDto {
   @IsDateString()
   startTime: Date;

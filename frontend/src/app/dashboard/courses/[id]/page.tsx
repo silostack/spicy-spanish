@@ -132,6 +132,7 @@ export default function CourseViewPage() {
         <TabsContent value="lessons">
           <LessonsTab
             courseId={courseId}
+            course={course}
             userRole={user?.role || ''}
             onCourseDataChanged={fetchCourse}
           />
