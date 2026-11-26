@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { EntityManager, EntityRepository } from "@mikro-orm/core";
 import { InjectRepository } from "@mikro-orm/nestjs";
 import { Course } from "./entities/course.entity";
 import { CourseSchedule } from "./entities/course-schedule.entity";
 import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
 import { LessonGeneratorService } from "../scheduling/lesson-generator.service";
+import { GoogleCalendarService } from "../scheduling/google-calendar.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateCourseDto,
@@ -17,6 +23,8 @@ import {
 
 @Injectable()
 export class CoursesService {
+  private readonly logger = new Logger(CoursesService.name);
+
   constructor(
     @InjectRepository(Course)
     private readonly courseRepository: EntityRepository<Course>,
@@ -28,6 +36,7 @@ export class CoursesService {
     private readonly userRepository: EntityRepository<User>,
     private readonly em: EntityManager,
     private readonly lessonGenerator: LessonGeneratorService,
+    private readonly googleCalendar: GoogleCalendarService,
   ) {}
 
   async findAllCourses() {
@@ -224,6 +233,139 @@ export class CoursesService {
       await this.em.removeAndFlush(futureLessons);
     }
     await this.lessonGenerator.generateLessonsForCourse(courseId);
+  }
+
+  // Tutor handover
+  /**
+   * Loads the tutor a course is being handed to. Not found if the user does not
+   * exist or is not a tutor; bad request if inactive or already the course tutor.
+   */
+  private async findNewTutor(
+    em: EntityManager,
+    course: Course,
+    tutorId: string,
+  ) {
+    const tutor = await em.findOne(User, { id: tutorId, role: UserRole.TUTOR });
+    if (!tutor) {
+      throw new NotFoundException(`Tutor with ID ${tutorId} not found`);
+    }
+    if (!tutor.isActive) {
+      throw new BadRequestException("Tutor is not active");
+    }
+    if (tutor.id === course.tutor.id) {
+      throw new BadRequestException("Tutor already teaches this course");
+    }
+    return tutor;
+  }
+
+  /**
+   * Lessons that follow the course to its new tutor: scheduled and not yet
+   * started. Manually rescheduled lessons are included; everything already
+   * started, completed, cancelled or no-show keeps its tutor.
+   */
+  private movableLessonsFilter(courseId: string, now: Date) {
+    return {
+      course: courseId,
+      status: LessonStatus.SCHEDULED,
+      startTime: { $gt: now },
+    };
+  }
+
+  async previewTutorChange(courseId: string, tutorId: string) {
+    const course = await this.findCourseById(courseId);
+    await this.findNewTutor(this.em, course, tutorId);
+    const now = new Date();
+
+    const lessonsToMove = await this.lessonRepository.find(
+      this.movableLessonsFilter(courseId, now),
+    );
+    const unloggedPastLessons = await this.lessonRepository.count({
+      course: courseId,
+      status: LessonStatus.SCHEDULED,
+      startTime: { $lte: now },
+    });
+    const otherLessons = await this.lessonRepository.find(
+      {
+        tutor: tutorId,
+        status: LessonStatus.SCHEDULED,
+        course: { $ne: courseId },
+        startTime: { $gt: now },
+      },
+      { populate: ["course"] },
+    );
+
+    const clashes = [];
+    for (const lesson of lessonsToMove) {
+      const other = otherLessons.find(
+        (candidate) =>
+          lesson.startTime < candidate.endTime &&
+          lesson.endTime > candidate.startTime,
+      );
+      if (other) {
+        clashes.push({
+          lessonId: lesson.id,
+          startTime: lesson.startTime,
+          endTime: lesson.endTime,
+          otherCourseTitle: other.course.title,
+        });
+      }
+    }
+
+    return {
+      lessonsToMove: lessonsToMove.length,
+      unloggedPastLessons,
+      clashes,
+    };
+  }
+
+  async changeTutor(courseId: string, tutorId: string, actor: User) {
+    const { oldTutorId, tutor, movedLessons } = await this.em.transactional(
+      async (em) => {
+        const course = await em.findOne(
+          Course,
+          { id: courseId },
+          { populate: ["tutor"] },
+        );
+        if (!course) {
+          throw new NotFoundException(`Course with ID ${courseId} not found`);
+        }
+        const tutor = await this.findNewTutor(em, course, tutorId);
+        const oldTutorId = course.tutor.id;
+
+        const movedLessons = await em.find(
+          Lesson,
+          this.movableLessonsFilter(courseId, new Date()),
+          { populate: ["students"] },
+        );
+        course.tutor = tutor;
+        for (const lesson of movedLessons) {
+          lesson.tutor = tutor;
+        }
+        await em.flush();
+        return { oldTutorId, tutor, movedLessons };
+      },
+    );
+
+    this.logger.log(
+      `Course ${courseId} tutor changed from ${oldTutorId} to ${tutor.id} by ${actor.id}; ${movedLessons.length} lessons moved`,
+    );
+
+    // Best effort: updateEvent logs and returns false on failure.
+    for (const lesson of movedLessons) {
+      if (!lesson.googleCalendarEventId) continue;
+      const studentNames = lesson.students
+        .getItems()
+        .map((student) => student.fullName)
+        .join(", ");
+      await this.googleCalendar.updateEvent(lesson.googleCalendarEventId, {
+        summary: `Spanish Class: ${studentNames} with ${tutor.fullName}`,
+        description: lesson.notes,
+        startTime: lesson.startTime,
+        endTime: lesson.endTime,
+      });
+    }
+
+    return this.findCourseById(courseId);
   }
 
   // Hours management

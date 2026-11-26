@@ -28,6 +28,6 @@ import { EmailModule } from "../email/email.module";
   ],
   controllers: [SchedulingController],
   providers: [SchedulingService, GoogleCalendarService, LessonGeneratorService],
-  exports: [SchedulingService, LessonGeneratorService],
+  exports: [SchedulingService, LessonGeneratorService, GoogleCalendarService],
 })
 export class SchedulingModule {}

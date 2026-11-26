@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { EntityManager, Collection } from "@mikro-orm/core";
 import { getRepositoryToken } from "@mikro-orm/nestjs";
 import { CoursesService } from "./courses.service";
@@ -7,6 +7,7 @@ import { Course } from "./entities/course.entity";
 import { CourseSchedule } from "./entities/course-schedule.entity";
 import { Lesson, LessonStatus } from "../scheduling/entities/lesson.entity";
 import { LessonGeneratorService } from "../scheduling/lesson-generator.service";
+import { GoogleCalendarService } from "../scheduling/google-calendar.service";
 import { User, UserRole } from "../users/entities/user.entity";
 
 type MockRepo = Record<string, jest.Mock>;
@@ -19,6 +20,7 @@ describe("CoursesService", () => {
   let userRepo: MockRepo;
   let em: Record<string, jest.Mock>;
   let lessonGenerator: Record<string, jest.Mock>;
+  let googleCalendar: Record<string, jest.Mock>;
 
   const mockTutor = {
     id: "tutor-1",
@@ -83,6 +85,7 @@ describe("CoursesService", () => {
 
     lessonRepo = {
       find: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     };
 
     userRepo = {
@@ -95,6 +98,18 @@ describe("CoursesService", () => {
       flush: jest.fn(),
       removeAndFlush: jest.fn(),
       assign: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      // Run the transaction callback against the same mock so assertions on
+      // `em` cover work done inside `em.transactional`.
+      transactional: jest.fn(),
+    };
+    em.transactional.mockImplementation((cb: (txEm: typeof em) => unknown) =>
+      cb(em),
+    );
+
+    googleCalendar = {
+      updateEvent: jest.fn().mockResolvedValue(true),
     };
 
     lessonGenerator = {
@@ -110,6 +125,7 @@ describe("CoursesService", () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: EntityManager, useValue: em },
         { provide: LessonGeneratorService, useValue: lessonGenerator },
+        { provide: GoogleCalendarService, useValue: googleCalendar },
       ],
     }).compile();
 
@@ -407,6 +423,325 @@ describe("CoursesService", () => {
 
       expect(result.totalCourses).toBe(5);
       expect(result.needsRenewalCourses).toBeDefined();
+    });
+  });
+  // ────────────────────────────────────────────────────────────────
+  // Tutor handover
+  // ────────────────────────────────────────────────────────────────
+
+  const oldTutor = {
+    id: "tutor-1",
+    role: UserRole.TUTOR,
+    isActive: true,
+    fullName: "Maria Garcia",
+  };
+  const newTutor = {
+    id: "tutor-2",
+    role: UserRole.TUTOR,
+    isActive: true,
+    fullName: "Ana Lopez",
+  };
+  const handoverStudent = { id: "student-1", fullName: "Jim Smith" };
+
+  const makeCourse = () => ({
+    id: "course-1",
+    title: "Jim - Conversational Spanish",
+    tutor: oldTutor,
+    hoursBalance: 7,
+    needsRenewal: false,
+  });
+
+  const makeLesson = (id: string, start: string, end: string, extra = {}) => ({
+    id,
+    tutor: oldTutor,
+    status: LessonStatus.SCHEDULED,
+    startTime: new Date(start),
+    endTime: new Date(end),
+    notes: undefined as string | undefined,
+    googleCalendarEventId: undefined as string | undefined,
+    students: { getItems: () => [handoverStudent] },
+    ...extra,
+  });
+
+  /** Route em.findOne by entity class to the given course and tutor. */
+  const mockEmLookups = (course: unknown, tutor: unknown) => {
+    em.findOne.mockImplementation((entity: unknown) => {
+      if (entity === Course) return Promise.resolve(course);
+      if (entity === User) return Promise.resolve(tutor);
+      return Promise.resolve(null);
+    });
+  };
+
+  describe("previewTutorChange", () => {
+    beforeEach(() => {
+      courseRepo.findOne.mockResolvedValue(makeCourse());
+      mockEmLookups(makeCourse(), newTutor);
+    });
+
+    it("counts lessons to move and unlogged past lessons", async () => {
+      lessonRepo.find
+        .mockResolvedValueOnce([
+          makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z"),
+          makeLesson("l2", "2099-01-12T15:00:00Z", "2099-01-12T16:00:00Z"),
+        ])
+        .mockResolvedValueOnce([]);
+      lessonRepo.count.mockResolvedValue(3);
+
+      const result = await service.previewTutorChange("course-1", "tutor-2");
+
+      expect(result).toEqual({
+        lessonsToMove: 2,
+        unloggedPastLessons: 3,
+        clashes: [],
+      });
+      expect(lessonRepo.find).toHaveBeenNthCalledWith(1, {
+        course: "course-1",
+        status: LessonStatus.SCHEDULED,
+        startTime: { $gt: expect.any(Date) },
+      });
+      expect(lessonRepo.count).toHaveBeenCalledWith({
+        course: "course-1",
+        status: LessonStatus.SCHEDULED,
+        startTime: { $lte: expect.any(Date) },
+      });
+    });
+
+    it("reports overlapping lessons of the new tutor as clashes and ignores non-overlapping ones", async () => {
+      lessonRepo.find
+        .mockResolvedValueOnce([
+          makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z"),
+          makeLesson("l2", "2099-01-12T15:00:00Z", "2099-01-12T16:00:00Z"),
+        ])
+        .mockResolvedValueOnce([
+          // overlaps l1 by 30 minutes
+          {
+            id: "o1",
+            startTime: new Date("2099-01-05T15:30:00Z"),
+            endTime: new Date("2099-01-05T16:30:00Z"),
+            course: { title: "Other course" },
+          },
+          // touches l2's end exactly: not a clash
+          {
+            id: "o2",
+            startTime: new Date("2099-01-12T16:00:00Z"),
+            endTime: new Date("2099-01-12T17:00:00Z"),
+            course: { title: "Back to back" },
+          },
+        ]);
+
+      const result = await service.previewTutorChange("course-1", "tutor-2");
+
+      expect(result.clashes).toEqual([
+        {
+          lessonId: "l1",
+          startTime: new Date("2099-01-05T15:00:00Z"),
+          endTime: new Date("2099-01-05T16:00:00Z"),
+          otherCourseTitle: "Other course",
+        },
+      ]);
+    });
+
+    it("queries the new tutor's other lessons excluding this course and non-scheduled lessons", async () => {
+      lessonRepo.find
+        .mockResolvedValueOnce([
+          makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z"),
+        ])
+        .mockResolvedValueOnce([]);
+
+      await service.previewTutorChange("course-1", "tutor-2");
+
+      expect(lessonRepo.find).toHaveBeenNthCalledWith(
+        2,
+        {
+          tutor: "tutor-2",
+          status: LessonStatus.SCHEDULED,
+          course: { $ne: "course-1" },
+          startTime: { $gt: expect.any(Date) },
+        },
+        { populate: ["course"] },
+      );
+    });
+
+    it("throws NotFoundException for an unknown course", async () => {
+      courseRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.previewTutorChange("missing", "tutor-2"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("throws NotFoundException for an unknown or non-tutor user", async () => {
+      mockEmLookups(makeCourse(), null);
+
+      await expect(
+        service.previewTutorChange("course-1", "student-1"),
+      ).rejects.toThrow(NotFoundException);
+      expect(em.findOne).toHaveBeenCalledWith(User, {
+        id: "student-1",
+        role: UserRole.TUTOR,
+      });
+    });
+
+    it("throws BadRequestException for the current tutor", async () => {
+      mockEmLookups(makeCourse(), oldTutor);
+
+      await expect(
+        service.previewTutorChange("course-1", "tutor-1"),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("changeTutor", () => {
+    const actor = { id: "admin-1", role: UserRole.ADMIN } as unknown as User;
+
+    it("moves the course and its upcoming scheduled lessons to the new tutor", async () => {
+      const course = makeCourse();
+      const upcoming = [
+        makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z"),
+        makeLesson("l2", "2099-01-12T15:00:00Z", "2099-01-12T16:00:00Z", {
+          originalStartTime: new Date("2099-01-11T15:00:00Z"),
+        }),
+      ];
+      mockEmLookups(course, newTutor);
+      em.find.mockResolvedValue(upcoming);
+      const updated = { ...course, tutor: newTutor };
+      courseRepo.findOne.mockResolvedValue(updated);
+
+      const result = await service.changeTutor("course-1", "tutor-2", actor);
+
+      expect(em.transactional).toHaveBeenCalled();
+      expect(course.tutor).toBe(newTutor);
+      expect(upcoming.every((lesson) => lesson.tutor === newTutor)).toBe(true);
+      expect(em.flush).toHaveBeenCalled();
+      expect(result).toBe(updated);
+    });
+
+    it("only queries scheduled, not-yet-started lessons of the course (completed, no-show, cancelled and started ones stay)", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, newTutor);
+      const moved = makeLesson(
+        "l1",
+        "2099-01-05T15:00:00Z",
+        "2099-01-05T16:00:00Z",
+      );
+      em.find.mockResolvedValue([moved]);
+      courseRepo.findOne.mockResolvedValue(course);
+
+      await service.changeTutor("course-1", "tutor-2", actor);
+
+      expect(em.find).toHaveBeenCalledTimes(1);
+      const [entity, criteria, options] = em.find.mock.calls[0];
+      expect(entity).toBe(Lesson);
+      expect(criteria).toEqual({
+        course: "course-1",
+        status: LessonStatus.SCHEDULED,
+        startTime: { $gt: expect.any(Date) },
+      });
+      // Manually rescheduled lessons are included: no originalStartTime filter.
+      expect(criteria).not.toHaveProperty("originalStartTime");
+      expect(criteria.startTime.$gt.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(options).toEqual({ populate: ["students"] });
+      expect(moved.tutor).toBe(newTutor);
+    });
+
+    it("leaves hoursBalance and needsRenewal unchanged", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, newTutor);
+      em.find.mockResolvedValue([
+        makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z"),
+      ]);
+      courseRepo.findOne.mockResolvedValue(course);
+
+      await service.changeTutor("course-1", "tutor-2", actor);
+
+      expect(course.hoursBalance).toBe(7);
+      expect(course.needsRenewal).toBe(false);
+    });
+
+    it("retitles calendar events of moved lessons after commit", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, newTutor);
+      em.find.mockResolvedValue([
+        makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z", {
+          googleCalendarEventId: "gcal-1",
+          notes: "Bring book",
+        }),
+        makeLesson("l2", "2099-01-12T15:00:00Z", "2099-01-12T16:00:00Z"),
+      ]);
+      courseRepo.findOne.mockResolvedValue(course);
+
+      await service.changeTutor("course-1", "tutor-2", actor);
+
+      expect(googleCalendar.updateEvent).toHaveBeenCalledTimes(1);
+      expect(googleCalendar.updateEvent).toHaveBeenCalledWith("gcal-1", {
+        summary: "Spanish Class: Jim Smith with Ana Lopez",
+        description: "Bring book",
+        startTime: new Date("2099-01-05T15:00:00Z"),
+        endTime: new Date("2099-01-05T16:00:00Z"),
+      });
+    });
+
+    it("does not fail the handover when a calendar update fails", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, newTutor);
+      em.find.mockResolvedValue([
+        makeLesson("l1", "2099-01-05T15:00:00Z", "2099-01-05T16:00:00Z", {
+          googleCalendarEventId: "gcal-1",
+        }),
+      ]);
+      googleCalendar.updateEvent.mockResolvedValue(false);
+      courseRepo.findOne.mockResolvedValue({ ...course, tutor: newTutor });
+
+      const result = await service.changeTutor("course-1", "tutor-2", actor);
+
+      expect(result.tutor).toBe(newTutor);
+      expect(course.tutor).toBe(newTutor);
+    });
+
+    it("throws NotFoundException for an unknown course and flushes nothing", async () => {
+      mockEmLookups(null, newTutor);
+
+      await expect(
+        service.changeTutor("missing", "tutor-2", actor),
+      ).rejects.toThrow(NotFoundException);
+      expect(em.flush).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException for an unknown or non-tutor user and flushes nothing", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, null);
+
+      await expect(
+        service.changeTutor("course-1", "student-1", actor),
+      ).rejects.toThrow(NotFoundException);
+      expect(em.findOne).toHaveBeenCalledWith(User, {
+        id: "student-1",
+        role: UserRole.TUTOR,
+      });
+      expect(em.flush).not.toHaveBeenCalled();
+      expect(course.tutor).toBe(oldTutor);
+    });
+
+    it("throws BadRequestException for an inactive tutor", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, { ...newTutor, isActive: false });
+
+      await expect(
+        service.changeTutor("course-1", "tutor-2", actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(em.flush).not.toHaveBeenCalled();
+      expect(course.tutor).toBe(oldTutor);
+    });
+
+    it("throws BadRequestException when the tutor is already the course tutor", async () => {
+      const course = makeCourse();
+      mockEmLookups(course, oldTutor);
+
+      await expect(
+        service.changeTutor("course-1", "tutor-1", actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(em.flush).not.toHaveBeenCalled();
+      expect(em.find).not.toHaveBeenCalled();
     });
   });
 });

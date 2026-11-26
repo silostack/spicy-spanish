@@ -7,12 +7,16 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
+  Req,
+  ParseUUIDPipe,
 } from "@nestjs/common";
+import type { Request } from "express";
 import { CoursesService } from "./courses.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
-import { UserRole } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateCourseDto,
   UpdateCourseDto,
@@ -20,6 +24,7 @@ import {
   RemoveStudentDto,
   AddScheduleDto,
   AdjustHoursDto,
+  ChangeTutorDto,
 } from "./dto";
 
 @Controller("courses")
@@ -101,6 +106,26 @@ export class CoursesController {
   @Roles(UserRole.ADMIN)
   adjustHours(@Param("id") id: string, @Body() dto: AdjustHoursDto) {
     return this.coursesService.adjustHours(id, dto);
+  }
+
+  // Tutor handover
+  @Get(":id/tutor-change-preview")
+  @Roles(UserRole.ADMIN)
+  previewTutorChange(
+    @Param("id") id: string,
+    @Query("tutorId", ParseUUIDPipe) tutorId: string,
+  ) {
+    return this.coursesService.previewTutorChange(id, tutorId);
+  }
+
+  @Patch(":id/tutor")
+  @Roles(UserRole.ADMIN)
+  changeTutor(
+    @Param("id") id: string,
+    @Body() dto: ChangeTutorDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.coursesService.changeTutor(id, dto.tutorId, req.user);
   }
 
   @Delete(":id")

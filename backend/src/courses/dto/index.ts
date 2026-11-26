@@ -87,3 +87,8 @@ export class AdjustHoursDto {
   @Min(-1000)
   hours: number;
 }
+
+export class ChangeTutorDto {
+  @IsUUID()
+  tutorId: string;
+}
