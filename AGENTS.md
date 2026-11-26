@@ -8,6 +8,24 @@ Spicy Spanish is a full-stack language school platform built as a monorepo with:
 - **Frontend**: Next.js 13+ with TypeScript, Tailwind CSS, running on port 8008
 - **Backend**: NestJS with TypeScript, PostgreSQL, MikroORM, running on port 3001
 
+## Workflow and skill routing
+
+Non-trivial work runs this sequence. Skill bodies live in `.claude/skills/` (Codex: `.agents/skills/` symlinks).
+
+```
+brainstorm     → planning/design/YYYY-MM-DD-<slug>-design.md
+write-plan     → planning/plans/YYYY-MM-DD-<slug>-plan.md
+exec-plan      → subagent per milestone; /code-review after each green commit (default depth medium)
+finish         → conventions, lint + test + build, migrations, env examples, docs, lessons, changelog
+deploy-steps   → planning/deployment/YYYY-MM-DD-<slug>-deployment.md (runbook only; does not deploy)
+```
+
+`brainstorm` designs from first principles: the goal (five whys), then the optimal design, then the
+current design, then a rewrite / converge / tweak verdict and the list of what the design retires.
+Shapes: [docs/guides/design-document-guide.md](docs/guides/design-document-guide.md),
+[docs/guides/exec-plan-contract.md](docs/guides/exec-plan-contract.md). Running `exec-plan` on an
+approved plan is consent for its per-milestone commits; every other commit still needs an explicit ask.
+
 ## Common Development Commands
 
 ### Frontend (Next.js)
@@ -94,10 +112,22 @@ Services:
 
 Environment variables for Docker are read from a `.env` file at the repo root. See `backend/.env.example` for required vars.
 
+## Production Deployment
+
+Production runs under **pm2** (the Docker setup is for local use only). A deploy is: pull the new code on the server, build, run any pending MikroORM migrations, then restart the pm2 service:
+
+```bash
+cd backend && npm ci && npm run build
+npm run migration:pending && npm run migration:up
+pm2 restart spicy-backend --update-env
+```
+
+Server app dir: `/home/si/projects/spicy-spanish`. pm2 processes: `spicy-backend`, `spicy-frontend` (rebuild and restart the frontend too when it changed). `/deploy-steps` writes the full runbook for a change.
+
 ## CI/CD
 
 GitHub Actions runs on every push/PR to `main`:
-- **Backend**: lint → test (198 unit tests) → build
+- **Backend**: lint → test (221 unit tests) → build
 - **Frontend**: lint → build
 
 ## Health Check
