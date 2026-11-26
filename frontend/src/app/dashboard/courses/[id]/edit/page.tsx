@@ -99,7 +99,8 @@ export default function CourseEditPage() {
         const [courseRes, studentsRes, tutorsRes] = await Promise.all([
           api.get(`/courses/${courseId}`),
           api.get('/users/students'),
-          api.get('/users/tutors'),
+          // A failing tutor list must not block editing the rest of the course.
+          api.get('/users/tutors').catch(() => ({ data: [] })),
         ]);
         const c: Course = courseRes.data;
         setCourse(c);
@@ -200,6 +201,7 @@ export default function CourseEditPage() {
     setError(null);
     try {
       const response = await api.post(`/courses/${courseId}/schedules`, newSlot);
+      setTutorPreview(null);
       setSchedules((prev) => [...prev, response.data]);
       setNewSlot({ dayOfWeek: 1, startTime: '10:00', endTime: '11:00' });
     } catch {
@@ -212,6 +214,7 @@ export default function CourseEditPage() {
   const handleRemoveSchedule = async (scheduleId: string) => {
     try {
       await api.delete(`/courses/schedules/${scheduleId}`);
+      setTutorPreview(null);
       setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
     } catch {
       setError('Failed to remove schedule slot');
