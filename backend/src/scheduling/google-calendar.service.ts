@@ -100,7 +100,13 @@ export class GoogleCalendarService {
         },
       };
 
-      await this.calendar.events.update({
+      if (params.attendeeEmails?.length) {
+        event.attendees = params.attendeeEmails.map((email) => ({ email }));
+      }
+
+      // patch, not update: update replaces the whole event and would drop the
+      // attendees and reminders set at creation.
+      await this.calendar.events.patch({
         calendarId: this.calendarId,
         eventId,
         requestBody: event,

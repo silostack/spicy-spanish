@@ -284,24 +284,31 @@ export class CoursesService {
       status: LessonStatus.SCHEDULED,
       startTime: { $lte: now },
     });
-    const otherLessons = await this.lessonRepository.find(
-      {
-        tutor: tutorId,
-        status: LessonStatus.SCHEDULED,
-        course: { $ne: courseId },
-        startTime: { $gt: now },
-      },
-      { populate: ["course"] },
+    const latestEnd = lessonsToMove.reduce<Date | null>(
+      (latest, lesson) =>
+        !latest || lesson.endTime > latest ? lesson.endTime : latest,
+      null,
     );
+    const otherLessons = latestEnd
+      ? await this.lessonRepository.find(
+          {
+            tutor: tutorId,
+            status: LessonStatus.SCHEDULED,
+            course: { $ne: courseId },
+            startTime: { $gt: now, $lt: latestEnd },
+          },
+          { populate: ["course"] },
+        )
+      : [];
 
     const clashes = [];
     for (const lesson of lessonsToMove) {
-      const other = otherLessons.find(
+      const overlapping = otherLessons.filter(
         (candidate) =>
           lesson.startTime < candidate.endTime &&
           lesson.endTime > candidate.startTime,
       );
-      if (other) {
+      for (const other of overlapping) {
         clashes.push({
           lessonId: lesson.id,
           startTime: lesson.startTime,
@@ -362,6 +369,10 @@ export class CoursesService {
         description: lesson.notes,
         startTime: lesson.startTime,
         endTime: lesson.endTime,
+        attendeeEmails: [
+          ...lesson.students.getItems().map((student) => student.email),
+          tutor.email,
+        ],
       });
     }
 

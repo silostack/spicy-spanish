@@ -112,7 +112,7 @@ export class CoursesController {
   @Get(":id/tutor-change-preview")
   @Roles(UserRole.ADMIN)
   previewTutorChange(
-    @Param("id") id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Query("tutorId", ParseUUIDPipe) tutorId: string,
   ) {
     return this.coursesService.previewTutorChange(id, tutorId);
@@ -121,7 +121,7 @@ export class CoursesController {
   @Patch(":id/tutor")
   @Roles(UserRole.ADMIN)
   changeTutor(
-    @Param("id") id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: ChangeTutorDto,
     @Req() req: Request & { user: User },
   ) {

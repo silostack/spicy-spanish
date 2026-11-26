@@ -440,8 +440,13 @@ describe("CoursesService", () => {
     role: UserRole.TUTOR,
     isActive: true,
     fullName: "Ana Lopez",
+    email: "ana@example.com",
   };
-  const handoverStudent = { id: "student-1", fullName: "Jim Smith" };
+  const handoverStudent = {
+    id: "student-1",
+    fullName: "Jim Smith",
+    email: "jim@example.com",
+  };
 
   const makeCourse = () => ({
     id: "course-1",
@@ -520,6 +525,13 @@ describe("CoursesService", () => {
             endTime: new Date("2099-01-05T16:30:00Z"),
             course: { title: "Other course" },
           },
+          // also overlaps l1, in a second course: reported separately
+          {
+            id: "o3",
+            startTime: new Date("2099-01-05T14:30:00Z"),
+            endTime: new Date("2099-01-05T15:15:00Z"),
+            course: { title: "Second course" },
+          },
           // touches l2's end exactly: not a clash
           {
             id: "o2",
@@ -537,6 +549,12 @@ describe("CoursesService", () => {
           startTime: new Date("2099-01-05T15:00:00Z"),
           endTime: new Date("2099-01-05T16:00:00Z"),
           otherCourseTitle: "Other course",
+        },
+        {
+          lessonId: "l1",
+          startTime: new Date("2099-01-05T15:00:00Z"),
+          endTime: new Date("2099-01-05T16:00:00Z"),
+          otherCourseTitle: "Second course",
         },
       ]);
     });
@@ -556,10 +574,22 @@ describe("CoursesService", () => {
           tutor: "tutor-2",
           status: LessonStatus.SCHEDULED,
           course: { $ne: "course-1" },
-          startTime: { $gt: expect.any(Date) },
+          startTime: {
+            $gt: expect.any(Date),
+            $lt: new Date("2099-01-05T16:00:00Z"),
+          },
         },
         { populate: ["course"] },
       );
+    });
+
+    it("skips the clash query when no lessons would move", async () => {
+      lessonRepo.find.mockResolvedValueOnce([]);
+
+      const result = await service.previewTutorChange("course-1", "tutor-2");
+
+      expect(result.clashes).toEqual([]);
+      expect(lessonRepo.find).toHaveBeenCalledTimes(1);
     });
 
     it("throws NotFoundException for an unknown course", async () => {
@@ -678,6 +708,7 @@ describe("CoursesService", () => {
         description: "Bring book",
         startTime: new Date("2099-01-05T15:00:00Z"),
         endTime: new Date("2099-01-05T16:00:00Z"),
+        attendeeEmails: ["jim@example.com", "ana@example.com"],
       });
     });
 
