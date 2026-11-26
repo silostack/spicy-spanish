@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../../../utils/api';
+import { format } from 'date-fns';
 import { sortSchedules } from '../../scheduleUtils';
+import { formatDateTime } from '../types';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -33,6 +35,25 @@ interface Course {
   hoursBalance: number;
   needsRenewal: boolean;
 }
+
+interface TutorOption extends CourseUser {
+  isActive: boolean;
+}
+
+interface TutorChangePreview {
+  lessonsToMove: number;
+  unloggedPastLessons: number;
+  clashes: Array<{ lessonId: string; startTime: string; endTime: string; otherCourseTitle: string }>;
+}
+
+const apiErrorMessage = (err: unknown, fallback: string) => {
+  const message = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data
+    ?.message;
+  if (Array.isArray(message)) return message.join(', ');
+  return message || fallback;
+};
+
+const fullName = (u: CourseUser) => `${u.firstName} ${u.lastName}`;
 
 interface ScheduleSlot {
   dayOfWeek: number;
@@ -64,13 +85,21 @@ export default function CourseEditPage() {
   // Available students
   const [allStudents, setAllStudents] = useState<CourseUser[]>([]);
 
+  // Tutor handover
+  const [allTutors, setAllTutors] = useState<TutorOption[]>([]);
+  const [selectedTutorId, setSelectedTutorId] = useState('');
+  const [tutorPreview, setTutorPreview] = useState<TutorChangePreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [changingTutor, setChangingTutor] = useState(false);
+
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [courseRes, studentsRes] = await Promise.all([
+        const [courseRes, studentsRes, tutorsRes] = await Promise.all([
           api.get(`/courses/${courseId}`),
           api.get('/users/students'),
+          api.get('/users/tutors'),
         ]);
         const c: Course = courseRes.data;
         setCourse(c);
@@ -83,6 +112,11 @@ export default function CourseEditPage() {
           ? studentsRes.data
           : studentsRes.data?.items || [];
         setAllStudents(studentsData);
+
+        const tutorsData = Array.isArray(tutorsRes.data)
+          ? tutorsRes.data
+          : tutorsRes.data?.items || [];
+        setAllTutors(tutorsData);
       } catch {
         setError('Failed to load course');
       } finally {
@@ -103,6 +137,46 @@ export default function CourseEditPage() {
       setError('Failed to save changes');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resetTutorPicker = () => {
+    setSelectedTutorId('');
+    setTutorPreview(null);
+  };
+
+  const handlePreviewTutorChange = async () => {
+    if (!selectedTutorId || loadingPreview) return;
+    setLoadingPreview(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await api.get(`/courses/${courseId}/tutor-change-preview`, {
+        params: { tutorId: selectedTutorId },
+      });
+      setTutorPreview(response.data);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Failed to preview tutor change'));
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleConfirmTutorChange = async () => {
+    if (!selectedTutorId || changingTutor) return;
+    setChangingTutor(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await api.patch(`/courses/${courseId}/tutor`, { tutorId: selectedTutorId });
+      const updated: Course = response.data;
+      setCourse(updated);
+      resetTutorPicker();
+      setSuccess(`Tutor changed to ${fullName(updated.tutor)}`);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Failed to change tutor'));
+    } finally {
+      setChangingTutor(false);
     }
   };
 
@@ -168,6 +242,9 @@ export default function CourseEditPage() {
     );
   }
 
+  const tutorOptions = allTutors.filter((t) => t.isActive && t.id !== course?.tutor?.id);
+  const selectedTutor = tutorOptions.find((t) => t.id === selectedTutorId);
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       {/* Header */}
@@ -222,6 +299,91 @@ export default function CourseEditPage() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Tutor */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h2 className="text-lg font-semibold text-spicy-dark mb-4">Tutor</h2>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Current tutor:{' '}
+              <span className="font-medium">{course?.tutor ? fullName(course.tutor) : '—'}</span>
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={selectedTutorId}
+                onChange={(e) => {
+                  setSelectedTutorId(e.target.value);
+                  setTutorPreview(null);
+                }}
+                disabled={changingTutor}
+                className="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-spicy-red"
+              >
+                <option value="">Select a new tutor…</option>
+                {tutorOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {fullName(t)} ({t.email})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handlePreviewTutorChange}
+                disabled={!selectedTutor || loadingPreview || changingTutor || tutorPreview !== null}
+                className="px-3 py-1.5 bg-spicy-red text-white rounded-md text-sm font-medium hover:bg-spicy-orange disabled:opacity-50"
+              >
+                {loadingPreview ? 'Checking...' : 'Change tutor'}
+              </button>
+            </div>
+
+            {tutorPreview && selectedTutor && course && (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-md space-y-3 text-sm text-gray-700">
+                <p>
+                  {tutorPreview.lessonsToMove} upcoming{' '}
+                  {tutorPreview.lessonsToMove === 1 ? 'lesson' : 'lessons'} will move to{' '}
+                  <span className="font-medium">{fullName(selectedTutor)}</span>.
+                </p>
+                {tutorPreview.unloggedPastLessons > 0 && (
+                  <p>
+                    {tutorPreview.unloggedPastLessons} past{' '}
+                    {tutorPreview.unloggedPastLessons === 1 ? 'lesson still needs' : 'lessons still need'}{' '}
+                    attendance and stay with{' '}
+                    <span className="font-medium">{fullName(course.tutor)}</span>; log them yourself.
+                  </p>
+                )}
+                {tutorPreview.clashes.length > 0 && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                    <p className="font-medium mb-1">
+                      {fullName(selectedTutor)} already has lessons at these times:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-0.5">
+                      {tutorPreview.clashes.map((c, i) => (
+                        <li key={`${c.lessonId}-${i}`}>
+                          {formatDateTime(c.startTime)} – {format(new Date(c.endTime), 'h:mm a')}{' '}
+                          (clashes with {c.otherCourseTitle})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={resetTutorPicker}
+                    disabled={changingTutor}
+                    className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmTutorChange}
+                    disabled={changingTutor}
+                    className="px-3 py-1.5 bg-spicy-red text-white rounded-md text-sm font-medium hover:bg-spicy-orange disabled:opacity-50"
+                  >
+                    {changingTutor ? 'Changing...' : 'Confirm change'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
